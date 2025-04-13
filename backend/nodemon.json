@@ -1,0 +1,12 @@
+{
+  "watch": ["src"],
+  "ext": "ts,json",
+  "ignore": [
+    "src/**/*.spec.ts",
+    "node_modules",
+    "dist",
+    "prisma/generated",
+    "node_modules/.prisma/client"
+  ],
+  "exec": "node ./dist/index.js"
+}
