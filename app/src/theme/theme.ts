@@ -295,12 +295,25 @@ export const darkTheme = {
   },
 };
 
+// Define OLED dark theme (true black for OLED screens)
+export const oledDarkTheme = {
+  ...darkTheme,
+  colors: {
+    ...darkTheme.colors,
+    background: '#000000', // True black for OLED screens
+    surface: '#000000',    // True black for OLED screens
+    surfaceVariant: '#121212', // Very dark gray for surface variant
+  },
+};
+
 // Export spacing for use throughout the app
 export const themeSpacing = spacing;
 
 // Export custom types
 export type ThemeType = 'light' | 'dark' | 'system';
+export type DarkModeType = 'dark' | 'oled';
 
 // Type assertion for our custom themes
 export const customLightTheme = lightTheme as CustomThemeColors;
 export const customDarkTheme = darkTheme as CustomThemeColors;
+export const customOledDarkTheme = oledDarkTheme as CustomThemeColors;

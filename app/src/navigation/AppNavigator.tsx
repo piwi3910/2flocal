@@ -13,8 +13,9 @@ import TOTPDetailScreen from '../screens/totp/TOTPDetailScreen';
 import AddTOTPScreen from '../screens/totp/AddTOTPScreen';
 import ScanQRCodeScreen from '../screens/totp/ScanQRCodeScreen';
 
-// Import Profile screen
+// Import Profile and Theme Settings screens
 import ProfileScreen from '../screens/ProfileScreen';
+import ThemeSettingsScreen from '../screens/ThemeSettingsScreen';
 
 // Define the root stack param list
 type RootStackParamList = {
@@ -28,6 +29,12 @@ type MainTabParamList = {
   Profile: undefined;
 };
 
+// Define the profile stack param list
+type ProfileStackParamList = {
+  ProfileMain: undefined;
+  ThemeSettings: undefined;
+};
+
 // Define the TOTP stack param list
 type TOTPStackParamList = {
   TOTPList: undefined;
@@ -39,6 +46,7 @@ type TOTPStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 const TOTPStack = createStackNavigator<TOTPStackParamList>();
+const ProfileStack = createStackNavigator<ProfileStackParamList>();
 
 // TOTP Stack Navigator
 const TOTPStackNavigator: React.FC = () => {
@@ -71,6 +79,24 @@ const TOTPStackNavigator: React.FC = () => {
   );
 };
 
+// Profile Stack Navigator
+const ProfileStackNavigator: React.FC = () => {
+  return (
+    <ProfileStack.Navigator>
+      <ProfileStack.Screen
+        name="ProfileMain"
+        component={ProfileScreen}
+        options={{ title: 'Profile' }}
+      />
+      <ProfileStack.Screen
+        name="ThemeSettings"
+        component={ThemeSettingsScreen}
+        options={{ title: 'Theme Settings' }}
+      />
+    </ProfileStack.Navigator>
+  );
+};
+
 // Main Tab Navigator
 const MainTabNavigator: React.FC = () => {
   return (
@@ -85,8 +111,11 @@ const MainTabNavigator: React.FC = () => {
       />
       <MainTab.Screen
         name="Profile"
-        component={ProfileScreen}
-        options={{ title: 'Profile' }}
+        component={ProfileStackNavigator}
+        options={{
+          title: 'Profile',
+          headerShown: false
+        }}
       />
     </MainTab.Navigator>
   );

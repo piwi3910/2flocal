@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import {
   View,
   Text,
@@ -9,9 +11,19 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { List } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 
+// Define the navigation prop type
+type ProfileStackParamList = {
+  ProfileMain: undefined;
+  ThemeSettings: undefined;
+};
+
+type ProfileScreenNavigationProp = StackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
+
 const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
   const {
     user,
     logout,
@@ -167,6 +179,22 @@ const ProfileScreen: React.FC = () => {
           <Text style={styles.label}>Email Verified</Text>
           <Text style={styles.value}>{user?.isEmailVerified ? 'Yes' : 'No'}</Text>
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Appearance</Text>
+        <TouchableOpacity
+          style={styles.settingItem}
+          onPress={() => navigation.navigate('ThemeSettings')}
+        >
+          <View style={styles.settingTextContainer}>
+            <Text style={styles.settingTitle}>Theme Settings</Text>
+            <Text style={styles.settingDescription}>
+              Customize app appearance and dark mode
+            </Text>
+          </View>
+          <List.Icon icon="chevron-right" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
