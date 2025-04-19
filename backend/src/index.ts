@@ -9,7 +9,7 @@ import accountsRouter from './routes/accounts'; // Import the accounts router
 import devicesRouter from './routes/devices'; // Import the devices router
 import adminRouter from './routes/admin'; // Import the admin router
 // Import Swagger setup
-const { setupSwagger } = require('./utils/swagger');
+import { setupSwagger } from './utils/swagger';
 
 const app = express();
 const port = process.env.PORT || 3000;
