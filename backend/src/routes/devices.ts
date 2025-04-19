@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/authMiddleware';
-import { registerDevice, listDevices } from '../controllers/deviceController'; // Import controllers
+import {
+    registerDevice,
+    listDevices,
+    updateDevice,
+    deleteDevice,
+    verifyDevice
+} from '../controllers/deviceController'; // Import controllers
 
 const router = Router();
 
@@ -8,12 +14,18 @@ const router = Router();
 router.use(authenticateToken);
 
 // POST /api/devices - Register a new device for the logged-in user
-router.post('/', registerDevice); // Use controller function
+router.post('/', registerDevice);
 
 // GET /api/devices - List devices for the logged-in user
-router.get('/', listDevices); // Use controller function
+router.get('/', listDevices);
 
-// Optional: DELETE /api/devices/:id - Remove a device (consider security implications)
-// router.delete('/:id', ...) 
+// PUT /api/devices/:id - Update a device for the logged-in user
+router.put('/:id', updateDevice);
+
+// DELETE /api/devices/:id - Delete a device for the logged-in user
+router.delete('/:id', deleteDevice);
+
+// POST /api/devices/:id/verify - Verify a device for the logged-in user
+router.post('/:id/verify', verifyDevice);
 
 export default router;

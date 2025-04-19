@@ -10,6 +10,11 @@ export const SecureStorageKeys = {
   REFRESH_TOKEN: 'refreshToken',
   USER_DATA: 'userData',
   REFRESH_TOKEN_EXPIRY: 'refreshTokenExpiry',
+  // Biometric authentication keys
+  BIOMETRICS_ENABLED: 'biometricsEnabled',
+  BIOMETRICS_FOR_APP_ACCESS: 'biometricsForAppAccess',
+  BIOMETRICS_FOR_TOTP_ACCESS: 'biometricsForTOTPAccess',
+  BIOMETRIC_PUBLIC_KEY: 'biometricPublicKey',
 };
 
 /**

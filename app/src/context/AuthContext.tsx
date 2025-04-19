@@ -3,6 +3,7 @@ import authService, { User, AuthResponse, setAuthToken } from '../services/authS
 import { api } from '../services/apiClient';
 import axios, { AxiosError } from 'axios';
 import secureStorage, { SecureStorageKeys } from '../services/secureStorageService';
+import biometricService from '../services/biometricService';
 
 // Define the shape of the context
 interface AuthContextType {
@@ -11,6 +12,11 @@ interface AuthContextType {
   refreshToken: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  // Biometric authentication state
+  isBiometricsAvailable: boolean;
+  isBiometricsEnabled: boolean;
+  biometryType: string | undefined;
+  // Authentication methods
   login: (email: string, password: string) => Promise<AuthResponse>;
   register: (name: string, email: string, password: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
@@ -21,6 +27,14 @@ interface AuthContextType {
   resendVerificationEmail: () => Promise<AuthResponse>;
   refreshAccessToken: () => Promise<AuthResponse | null>;
   revokeToken: () => Promise<AuthResponse | null>;
+  // Biometric authentication methods
+  authenticateWithBiometrics: (promptMessage?: string) => Promise<boolean>;
+  enableBiometrics: () => Promise<boolean>;
+  disableBiometrics: () => Promise<boolean>;
+  setBiometricsForAppAccess: (enabled: boolean) => Promise<boolean>;
+  isBiometricsForAppAccessEnabled: () => Promise<boolean>;
+  setBiometricsForTOTPAccess: (enabled: boolean) => Promise<boolean>;
+  isBiometricsForTOTPAccessEnabled: () => Promise<boolean>;
 }
 
 // Create the context with a default value
@@ -30,6 +44,11 @@ const AuthContext = createContext<AuthContextType>({
   refreshToken: null,
   isLoading: true,
   isAuthenticated: false,
+  // Biometric authentication state
+  isBiometricsAvailable: false,
+  isBiometricsEnabled: false,
+  biometryType: undefined,
+  // Authentication methods
   login: async () => ({ message: '' }),
   register: async () => ({ message: '' }),
   logout: async () => {},
@@ -40,6 +59,14 @@ const AuthContext = createContext<AuthContextType>({
   resendVerificationEmail: async () => ({ message: '' }),
   refreshAccessToken: async () => null,
   revokeToken: async () => null,
+  // Biometric authentication methods
+  authenticateWithBiometrics: async () => false,
+  enableBiometrics: async () => false,
+  disableBiometrics: async () => false,
+  setBiometricsForAppAccess: async () => false,
+  isBiometricsForAppAccessEnabled: async () => false,
+  setBiometricsForTOTPAccess: async () => false,
+  isBiometricsForTOTPAccessEnabled: async () => false,
 });
 
 // Storage keys are now defined in secureStorageService.ts
@@ -51,6 +78,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshAttemptRef = useRef<boolean>(false);
+  
+  // Biometric authentication state
+  const [isBiometricsAvailable, setIsBiometricsAvailable] = useState<boolean>(false);
+  const [isBiometricsEnabled, setIsBiometricsEnabled] = useState<boolean>(false);
+  const [biometryType, setBiometryType] = useState<string | undefined>(undefined);
 
   // Logout function - defined early to avoid reference issues
   const logout = useCallback(async (): Promise<void> => {
@@ -103,6 +135,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     loadStoredAuth();
+  }, []);
+  
+  // Check biometric availability and load biometric settings on mount
+  useEffect(() => {
+    const checkBiometrics = async () => {
+      try {
+        // Check if biometrics are available on the device
+        const { available, biometryType } = await biometricService.isBiometricAvailable();
+        setIsBiometricsAvailable(available);
+        setBiometryType(biometryType);
+        
+        // Load biometric settings from secure storage
+        const enabled = await biometricService.isBiometricsEnabled();
+        setIsBiometricsEnabled(enabled);
+      } catch (error) {
+        console.error('Error checking biometric availability:', error);
+      }
+    };
+    
+    checkBiometrics();
   }, []);
 
   // Store authentication state when it changes
@@ -293,6 +345,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('An unknown error occurred during password reset');
     }
   }, []);
+  
+  // Authenticate with biometrics
+  const authenticateWithBiometrics = useCallback(
+    async (promptMessage: string = 'Verify your identity'): Promise<boolean> => {
+      try {
+        // Check if biometrics are enabled and available
+        if (!isBiometricsEnabled || !isBiometricsAvailable) {
+          return false;
+        }
+        
+        // Prompt for biometric authentication
+        const { success } = await biometricService.authenticate(promptMessage);
+        return success;
+      } catch (error) {
+        console.error('Error authenticating with biometrics:', error);
+        return false;
+      }
+    },
+    [isBiometricsEnabled, isBiometricsAvailable]
+  );
+  
+  // Enable biometrics
+  const enableBiometrics = useCallback(async (): Promise<boolean> => {
+    try {
+      const success = await biometricService.enableBiometrics();
+      if (success) {
+        setIsBiometricsEnabled(true);
+      }
+      return success;
+    } catch (error) {
+      console.error('Error enabling biometrics:', error);
+      return false;
+    }
+  }, []);
+  
+  // Disable biometrics
+  const disableBiometrics = useCallback(async (): Promise<boolean> => {
+    try {
+      const success = await biometricService.disableBiometrics();
+      if (success) {
+        setIsBiometricsEnabled(false);
+      }
+      return success;
+    } catch (error) {
+      console.error('Error disabling biometrics:', error);
+      return false;
+    }
+  }, []);
+  
+  // Set biometrics for app access
+  const setBiometricsForAppAccess = useCallback(async (enabled: boolean): Promise<boolean> => {
+    try {
+      return await biometricService.setBiometricsForAppAccess(enabled);
+    } catch (error) {
+      console.error('Error setting biometrics for app access:', error);
+      return false;
+    }
+  }, []);
+  
+  // Check if biometrics are enabled for app access
+  const isBiometricsForAppAccessEnabled = useCallback(async (): Promise<boolean> => {
+    try {
+      return await biometricService.isBiometricsForAppAccessEnabled();
+    } catch (error) {
+      console.error('Error checking if biometrics are enabled for app access:', error);
+      return false;
+    }
+  }, []);
+  
+  // Set biometrics for TOTP access
+  const setBiometricsForTOTPAccess = useCallback(async (enabled: boolean): Promise<boolean> => {
+    try {
+      return await biometricService.setBiometricsForTOTPAccess(enabled);
+    } catch (error) {
+      console.error('Error setting biometrics for TOTP access:', error);
+      return false;
+    }
+  }, []);
+  
+  // Check if biometrics are enabled for TOTP access
+  const isBiometricsForTOTPAccessEnabled = useCallback(async (): Promise<boolean> => {
+    try {
+      return await biometricService.isBiometricsForTOTPAccessEnabled();
+    } catch (error) {
+      console.error('Error checking if biometrics are enabled for TOTP access:', error);
+      return false;
+    }
+  }, []);
 
   // Verify email function
   const verifyEmail = useCallback(async (token: string): Promise<AuthResponse> => {
@@ -349,6 +489,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshToken,
     isLoading,
     isAuthenticated: !!token && !!user,
+    // Biometric authentication state
+    isBiometricsAvailable,
+    isBiometricsEnabled,
+    biometryType,
+    // Authentication methods
     login,
     register,
     logout,
@@ -359,6 +504,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resendVerificationEmail,
     refreshAccessToken,
     revokeToken,
+    // Biometric authentication methods
+    authenticateWithBiometrics,
+    enableBiometrics,
+    disableBiometrics,
+    setBiometricsForAppAccess,
+    isBiometricsForAppAccessEnabled,
+    setBiometricsForTOTPAccess,
+    isBiometricsForTOTPAccessEnabled,
   };
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;

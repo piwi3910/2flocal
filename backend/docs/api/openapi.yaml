@@ -1,0 +1,1025 @@
+openapi: 3.1.0
+info:
+  title: 2FLocal API
+  description: API for the 2FLocal two-factor authentication application
+  version: 1.0.0
+servers:
+  - url: /api
+    description: API base path
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RefreshToken:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh token for obtaining new access tokens
+        expiresAt:
+          type: string
+          format: date-time
+          description: Expiration date and time of the refresh token
+      required:
+        - refreshToken
+        - expiresAt
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+      required:
+        - message
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: User ID
+        email:
+          type: string
+          description: User email
+        name:
+          type: string
+          description: User's name
+        isAdmin:
+          type: boolean
+          description: Whether the user is an admin
+        isEmailVerified:
+          type: boolean
+          description: Whether the user's email is verified
+      required:
+        - id
+        - email
+        - isAdmin
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Device ID
+        identifier:
+          type: string
+          description: Unique identifier for the physical device
+        name:
+          type: string
+          description: User-given name for the device
+        type:
+          type: string
+          enum: [MOBILE, DESKTOP, WEB, OTHER]
+          description: Type of device
+        lastSeen:
+          type: string
+          format: date-time
+          description: Last time the device was seen/used
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+        - id
+        - identifier
+        - name
+        - type
+        - lastSeen
+        - createdAt
+        - updatedAt
+    AccountSecret:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Account Secret ID
+        issuer:
+          type: string
+          description: Service issuer (e.g., "Google", "GitHub")
+        label:
+          type: string
+          description: Account label (e.g., "user@example.com", "username")
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+        - id
+        - issuer
+        - label
+        - createdAt
+        - updatedAt
+    TOTPCode:
+      type: object
+      properties:
+        code:
+          type: string
+          description: The current TOTP code
+        remainingSeconds:
+          type: integer
+          description: Seconds remaining until the code expires
+        period:
+          type: integer
+          description: Time step in seconds (usually 30)
+        issuer:
+          type: string
+          description: Service issuer (e.g., "Google", "GitHub")
+        label:
+          type: string
+          description: Account label (e.g., "user@example.com", "username")
+      required:
+        - code
+        - remainingSeconds
+        - period
+        - issuer
+        - label
+    NewAccountSecret:
+      type: object
+      properties:
+        issuer:
+          type: string
+          description: Service issuer (e.g., "Google", "GitHub")
+        label:
+          type: string
+          description: Account label (e.g., "user@example.com", "username")
+        secret:
+          type: string
+          description: TOTP secret (base32 encoded)
+      required:
+        - issuer
+        - label
+        - secret
+        
+    QRCode:
+      type: object
+      properties:
+        qrCode:
+          type: string
+          description: QR code as a data URL (base64 encoded image)
+        uri:
+          type: string
+          description: The TOTP URI encoded in the QR code
+      required:
+        - qrCode
+        - uri
+        
+    ParsedQRCode:
+      type: object
+      properties:
+        uri:
+          type: string
+          description: The TOTP URI extracted from the QR code
+        secret:
+          type: string
+          description: The TOTP secret extracted from the QR code
+        issuer:
+          type: string
+          description: The service issuer extracted from the QR code
+        label:
+          type: string
+          description: The account label extracted from the QR code
+        algorithm:
+          type: string
+          description: The HMAC algorithm (SHA1, SHA256, SHA512)
+        digits:
+          type: integer
+          description: The number of digits in the TOTP code
+        period:
+          type: integer
+          description: The time step in seconds
+      required:
+        - uri
+        - secret
+        - issuer
+        - label
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      description: Create a new user account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email
+                password:
+                  type: string
+                  format: password
+                  description: User password
+              required:
+                - email
+                - password
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: User ID
+                  email:
+                    type: string
+                    description: User email
+                  message:
+                    type: string
+                    description: Success message
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/login:
+    post:
+      summary: Login
+      description: Authenticate a user and get a JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email
+                password:
+                  type: string
+                  format: password
+                  description: User password
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: JWT access token (short-lived)
+                  refreshToken:
+                    type: string
+                    description: Refresh token for obtaining new access tokens (long-lived)
+                  refreshTokenExpiry:
+                    type: string
+                    format: date-time
+                    description: Expiration date and time of the refresh token
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/me:
+    get:
+      summary: Get current user
+      description: Get information about the currently authenticated user
+      responses:
+        '200':
+          description: User information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/verify-email/{token}:
+    get:
+      summary: Verify email address
+      description: Verify a user's email address using a verification token
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: Email verification token
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '400':
+          description: Invalid or expired verification token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/forgot-password:
+    post:
+      summary: Forgot password
+      description: Request a password reset link
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email
+              required:
+                - email
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/reset-password:
+    post:
+      summary: Reset password
+      description: Reset password using a token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Password reset token
+                password:
+                  type: string
+                  format: password
+                  description: New password
+              required:
+                - token
+                - password
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/profile:
+    put:
+      summary: Update user profile
+      description: Update the authenticated user's profile information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User's name
+                email:
+                  type: string
+                  format: email
+                  description: User's email
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/resend-verification:
+    post:
+      summary: Resend verification email
+      description: Resend the email verification link to the authenticated user
+      responses:
+        '200':
+          description: Verification email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '400':
+          description: Email already verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/refresh-token:
+    post:
+      summary: Refresh access token
+      description: Get a new access token using a valid refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  description: Refresh token obtained during login or previous refresh
+              required:
+                - refreshToken
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  accessToken:
+                    type: string
+                    description: New JWT access token
+                  refreshToken:
+                    type: string
+                    description: New refresh token (token rotation for security)
+                  refreshTokenExpiry:
+                    type: string
+                    format: date-time
+                    description: Expiration date and time of the new refresh token
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/revoke-token:
+    post:
+      summary: Revoke refresh token
+      description: Revoke a specific refresh token to prevent its future use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  description: Refresh token to revoke
+              required:
+                - refreshToken
+      responses:
+        '200':
+          description: Token revoked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Token does not belong to the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/revoke-all-tokens:
+    post:
+      summary: Revoke all refresh tokens
+      description: Revoke all refresh tokens for the current user
+      responses:
+        '200':
+          description: All tokens revoked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  count:
+                    type: integer
+                    description: Number of tokens revoked
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /accounts:
+    get:
+      summary: List account secrets
+      description: Get a list of all account secrets for the authenticated user
+      responses:
+        '200':
+          description: List of account secrets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccountSecret'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Add account secret
+      description: Add a new account secret for the authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewAccountSecret'
+      responses:
+        '201':
+          description: Account secret added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Account Secret ID
+                  issuer:
+                    type: string
+                    description: Service issuer
+                  label:
+                    type: string
+                    description: Account label
+                  message:
+                    type: string
+                    description: Success message
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /accounts/{id}:
+    delete:
+      summary: Delete account secret
+      description: Delete an account secret by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Account Secret ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Account secret deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /accounts/{id}/totp:
+    get:
+      summary: Generate TOTP code
+      description: Generate a TOTP code for a specific account secret
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Account Secret ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TOTP code generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TOTPCode'
+        '400':
+          description: Invalid input or secret format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error (e.g., decryption failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /accounts/{id}/qrcode:
+    get:
+      summary: Generate QR code for account secret
+      description: Generate a QR code for a specific account secret
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Account Secret ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: QR code generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QRCode'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error (e.g., QR code generation failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+  /accounts/parse-qrcode:
+    post:
+      summary: Parse QR code image
+      description: Parse a QR code image to extract TOTP secret and other information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  description: QR code image as a base64 string
+              required:
+                - image
+      responses:
+        '200':
+          description: QR code parsed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParsedQRCode'
+        '400':
+          description: Invalid input or QR code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /devices:
+    get:
+      summary: List devices
+      description: Get a list of all devices for the authenticated user
+      responses:
+        '200':
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Register device
+      description: Register a new device for the authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                identifier:
+                  type: string
+                  description: Unique identifier for the physical device
+                name:
+                  type: string
+                  description: User-given name for the device
+                type:
+                  type: string
+                  enum: [MOBILE, DESKTOP, WEB, OTHER]
+                  description: Type of device
+              required:
+                - identifier
+                - name
+                - type
+      responses:
+        '201':
+          description: Device registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Device already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /devices/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Device ID
+        schema:
+          type: string
+    put:
+      summary: Update device
+      description: Update a device for the authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User-given name for the device
+                type:
+                  type: string
+                  enum: [MOBILE, DESKTOP, WEB, OTHER]
+                  description: Type of device
+      responses:
+        '200':
+          description: Device updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Device not found or does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete device
+      description: Delete a device for the authenticated user
+      responses:
+        '204':
+          description: Device deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Device not found or does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /devices/{id}/verify:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Device ID
+        schema:
+          type: string
+    post:
+      summary: Verify device
+      description: Verify a device for the authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                verificationCode:
+                  type: string
+                  description: Verification code for the device
+              required:
+                - verificationCode
+      responses:
+        '200':
+          description: Device verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Device not found or does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

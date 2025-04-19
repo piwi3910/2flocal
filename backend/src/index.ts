@@ -2,6 +2,8 @@ require('dotenv').config(); // Load .env file
 
 import express, { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '../prisma/src/generated/prisma'; // Corrected relative path
+import { errorHandler, notFoundHandler } from './middleware/errorMiddleware';
+import { apiLimiter } from './middleware/rateLimitMiddleware';
 import authRouter from './routes/auth'; // Import the auth router
 import accountsRouter from './routes/accounts'; // Import the accounts router
 import devicesRouter from './routes/devices'; // Import the devices router
@@ -17,7 +19,11 @@ app.get('/', (req: Request, res: Response) => {
   res.send('2FLocal Backend is running!');
 });
 
-// --- Mount API routes --- 
+// --- Apply API Rate Limiting ---
+// This applies a general rate limit to all API routes
+app.use('/api', apiLimiter);
+
+// --- Mount API routes ---
 app.use('/api/auth', authRouter); // Use the auth routes
 app.use('/api/accounts', accountsRouter); // Use the accounts routes
 app.use('/api/devices', devicesRouter); // Use the devices routes
@@ -25,12 +31,28 @@ app.use('/api/admin', adminRouter); // Use the admin routes
 
 // --- TODO: Add other API routes --- 
 
-// --- Basic Error Handling Middleware ---
-// This should be placed after all routes and other middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error("Unhandled Error:", err.stack); // Log the error stack for debugging
-  res.status(500).json({ message: 'Internal Server Error' }); // Send generic error response
+// --- API Security Headers ---
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Remove X-Powered-By header to avoid exposing Express
+  res.removeHeader('X-Powered-By');
+  
+  // Set security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Content-Security-Policy', "default-src 'self'");
+  
+  next();
 });
+
+// --- 404 Handler (for routes that don't exist) ---
+// This should be placed after all routes
+app.use(notFoundHandler);
+
+// --- Error Handling Middleware ---
+// This should be placed after all routes and other middleware
+app.use(errorHandler);
 
 async function main(): Promise<void> { // Explicit return type
   const prisma = new PrismaClient(); // Instantiate Prisma here
