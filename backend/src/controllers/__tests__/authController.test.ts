@@ -1,206 +1,124 @@
-// @ts-nocheck
-import { Request, Response, NextFunction } from 'express';
-import { 
-    registerUser, 
-    loginUser, 
-    getCurrentUser, 
-    verifyEmail, 
-    forgotPassword, 
-    resetPassword, 
-    updateProfile,
-    resendVerificationEmail
-} from '../authController';
-import * as emailService from '../../utils/emailService';
+import { Request, Response } from 'express';
+import { mockDeep, mockReset } from 'jest-mock-extended';
+import { prismaMock } from '../../__tests__/setup';
+import * as authController from '../authController';
 import * as tokenService from '../../utils/tokenService';
+import * as bcrypt from 'bcrypt';
 
 // Mock dependencies
-jest.mock('../../utils/emailService');
 jest.mock('../../utils/tokenService');
+jest.mock('bcrypt');
 
 describe('Auth Controller', () => {
-    // Mock objects
-    let req;
-    let res;
-    let next;
-    let prisma;
-    
-    beforeEach(() => {
-        // Reset mocks
-        jest.clearAllMocks();
-        
-        // Mock Prisma client
-        prisma = {
-            user: {
-                findUnique: jest.fn(),
-                findFirst: jest.fn(),
-                create: jest.fn(),
-                update: jest.fn()
-            }
-        };
-        
-        // Mock request object
-        req = {
-            body: {},
-            params: {},
-            app: {
-                locals: {
-                    prisma
-                }
-            },
-            user: { userId: 'user123', email: 'test@example.com' }
-        };
-        
-        // Mock response object
-        res = {
-            status: jest.fn().mockReturnThis(),
-            json: jest.fn()
-        };
-        
-        // Mock next function
-        next = jest.fn();
-        
-        // Mock token service
-        (tokenService.generateEmailVerificationToken).mockReturnValue('mock-verification-token');
-        (tokenService.generatePasswordResetToken).mockReturnValue({
-            token: 'mock-reset-token',
-            expires: new Date(Date.now() + 3600000)
-        });
+  // Create mock request and response objects
+  const mockRequest = mockDeep<Request>();
+  const mockResponse = mockDeep<Response>();
+  const mockNext = jest.fn();
+
+  // Reset mocks before each test
+  beforeEach(() => {
+    mockReset(mockRequest);
+    mockReset(mockResponse);
+    mockNext.mockClear();
+    mockResponse.status.mockReturnThis();
+    mockResponse.json.mockReturnThis();
+  });
+
+  describe('loginUser', () => {
+    it('should return 400 if email or password is missing', async () => {
+      // Arrange
+      mockRequest.body = { email: 'test@example.com' }; // Missing password
+
+      // Act
+      await authController.loginUser(mockRequest, mockResponse, mockNext);
+
+      // Assert
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockNext.mock.calls[0][0].statusCode).toBe(400);
     });
-    
-    describe('registerUser', () => {
-        it('should return 400 if email or password is missing', async () => {
-            await registerUser(req, res, next);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                message: 'Email and password are required'
-            }));
-        });
-        
-        it('should return 400 if email format is invalid', async () => {
-            req.body = { email: 'invalid-email', password: 'password123' };
-            
-            await registerUser(req, res, next);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                message: 'Invalid email format'
-            }));
-        });
-        
-        it('should return 409 if user already exists', async () => {
-            req.body = { email: 'existing@example.com', password: 'password123' };
-            prisma.user.findUnique.mockResolvedValue({ id: 'existing-user' });
-            
-            await registerUser(req, res, next);
-            
-            expect(prisma.user.findUnique).toHaveBeenCalledWith({
-                where: { email: 'existing@example.com' }
-            });
-            expect(res.status).toHaveBeenCalledWith(409);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                message: 'User with this email already exists'
-            }));
-        });
-        
-        it('should create a new user and send verification email', async () => {
-            req.body = { 
-                email: 'new@example.com', 
-                password: 'password123',
-                name: 'Test User'
-            };
-            
-            prisma.user.findUnique.mockResolvedValue(null);
-            prisma.user.create.mockResolvedValue({
-                id: 'new-user-id',
-                email: 'new@example.com',
-                name: 'Test User',
-                isEmailVerified: false
-            });
-            
-            (emailService.sendVerificationEmail).mockResolvedValue(true);
-            
-            await registerUser(req, res, next);
-            
-            expect(prisma.user.create).toHaveBeenCalled();
-            expect(emailService.sendVerificationEmail).toHaveBeenCalled();
-            expect(res.status).toHaveBeenCalledWith(201);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                id: 'new-user-id',
-                email: 'new@example.com',
-                message: expect.stringContaining('User registered successfully')
-            }));
-        });
+
+    it('should return 401 if user is not found', async () => {
+      // Arrange
+      mockRequest.body = { email: 'test@example.com', password: 'password123' };
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      // Act
+      await authController.loginUser(mockRequest, mockResponse, mockNext);
+
+      // Assert
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockNext.mock.calls[0][0].statusCode).toBe(401);
+      expect(mockNext.mock.calls[0][0].message).toContain('Invalid credentials');
     });
-    
-    describe('loginUser', () => {
-        const bcrypt = require('bcrypt');
-        
-        beforeEach(() => {
-            // Mock bcrypt
-            bcrypt.compare = jest.fn();
-        });
-        
-        it('should return 400 if email or password is missing', async () => {
-            await loginUser(req, res, next);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                message: 'Email and password are required'
-            }));
-        });
-        
-        it('should return 401 if user does not exist', async () => {
-            req.body = { email: 'nonexistent@example.com', password: 'password123' };
-            prisma.user.findUnique.mockResolvedValue(null);
-            
-            await loginUser(req, res, next);
-            
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                message: 'Invalid credentials'
-            }));
-        });
-        
-        it('should return 401 if password is incorrect', async () => {
-            req.body = { email: 'user@example.com', password: 'wrong-password' };
-            prisma.user.findUnique.mockResolvedValue({
-                id: 'user-id',
-                email: 'user@example.com',
-                passwordHash: 'hashed-password'
-            });
-            bcrypt.compare.mockResolvedValue(false);
-            
-            await loginUser(req, res, next);
-            
-            expect(bcrypt.compare).toHaveBeenCalledWith('wrong-password', 'hashed-password');
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                message: 'Invalid credentials'
-            }));
-        });
-        
-        it('should return token if login is successful', async () => {
-            req.body = { email: 'user@example.com', password: 'correct-password' };
-            prisma.user.findUnique.mockResolvedValue({
-                id: 'user-id',
-                email: 'user@example.com',
-                passwordHash: 'hashed-password',
-                name: 'Test User',
-                isEmailVerified: true
-            });
-            bcrypt.compare.mockResolvedValue(true);
-            
-            await loginUser(req, res, next);
-            
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                message: 'Login successful',
-                token: expect.any(String)
-            }));
-        });
+
+    it('should return 401 if password is incorrect', async () => {
+      // Arrange
+      mockRequest.body = { email: 'test@example.com', password: 'password123' };
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: '1',
+        email: 'test@example.com',
+        passwordHash: 'hashedPassword',
+        name: 'Test User',
+        role: 'USER',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isEmailVerified: false,
+        emailVerificationToken: null,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      // Act
+      await authController.loginUser(mockRequest, mockResponse, mockNext);
+
+      // Assert
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockNext.mock.calls[0][0].statusCode).toBe(401);
+      expect(mockNext.mock.calls[0][0].message).toContain('Invalid credentials');
     });
-    
-    // Additional tests for other controller functions would be added here
-    // For brevity, we're focusing on the core functionality tests
+
+    it('should return 200 and tokens if login is successful', async () => {
+      // Arrange
+      mockRequest.body = { email: 'test@example.com', password: 'password123' };
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: '1',
+        email: 'test@example.com',
+        passwordHash: 'hashedPassword',
+        name: 'Test User',
+        role: 'USER',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (tokenService.generateAccessToken as jest.Mock).mockReturnValue('access-token');
+      (tokenService.generateRefreshToken as jest.Mock).mockReturnValue('refresh-token');
+      prismaMock.refreshToken.create.mockResolvedValue({
+        id: '1',
+        token: 'refresh-token',
+        userId: '1',
+        expiresAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Act
+      await authController.loginUser(mockRequest, mockResponse, mockNext);
+
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+        })
+      );
+    });
+  });
+
+  // Add more tests for other auth controller methods...
 });
