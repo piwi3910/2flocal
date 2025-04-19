@@ -10,6 +10,7 @@ import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from './src/context/AuthContext';
+import { AnimationProvider } from './src/context/AnimationContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import ThemeProvider, { useAppTheme } from './src/theme/ThemeProvider';
 
@@ -30,9 +31,11 @@ function App(): React.JSX.Element {
     <ThemeProvider>
       <SafeAreaProvider>
         <ThemedStatusBar />
-        <AuthProvider>
-          <AppNavigator />
-        </AuthProvider>
+        <AnimationProvider>
+          <AuthProvider>
+            <AppNavigator />
+          </AuthProvider>
+        </AnimationProvider>
       </SafeAreaProvider>
     </ThemeProvider>
   );

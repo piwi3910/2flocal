@@ -6,6 +6,7 @@ import { StyleSheet, View, Text } from 'react-native';
 
 import AuthNavigator from './AuthNavigator';
 import { useAuth } from '../context/AuthContext';
+import { getTransitionForRoute, tabTransition } from './transitions';
 
 // Import TOTP screens
 import TOTPListScreen from '../screens/totp/TOTPListScreen';
@@ -60,12 +61,18 @@ const TOTPStackNavigator: React.FC = () => {
       <TOTPStack.Screen
         name="TOTPDetail"
         component={TOTPDetailScreen}
-        options={{ title: 'TOTP Details' }}
+        options={{
+          title: 'TOTP Details',
+          ...getTransitionForRoute('TOTPDetail')
+        }}
       />
       <TOTPStack.Screen
         name="AddTOTP"
         component={AddTOTPScreen}
-        options={{ title: 'Add TOTP Account' }}
+        options={{
+          title: 'Add TOTP Account',
+          ...getTransitionForRoute('AddTOTP')
+        }}
       />
       <TOTPStack.Screen
         name="ScanQRCode"
@@ -73,6 +80,7 @@ const TOTPStackNavigator: React.FC = () => {
         options={{
           title: 'Scan QR Code',
           headerShown: false,
+          ...getTransitionForRoute('ScanQRCode')
         }}
       />
     </TOTPStack.Navigator>
@@ -91,7 +99,10 @@ const ProfileStackNavigator: React.FC = () => {
       <ProfileStack.Screen
         name="ThemeSettings"
         component={ThemeSettingsScreen}
-        options={{ title: 'Theme Settings' }}
+        options={{
+          title: 'Theme Settings',
+          ...getTransitionForRoute('ThemeSettings')
+        }}
       />
     </ProfileStack.Navigator>
   );
@@ -100,7 +111,11 @@ const ProfileStackNavigator: React.FC = () => {
 // Main Tab Navigator
 const MainTabNavigator: React.FC = () => {
   return (
-    <MainTab.Navigator>
+    <MainTab.Navigator
+      screenOptions={{
+        ...tabTransition
+      }}
+    >
       <MainTab.Screen
         name="TOTPStack"
         component={TOTPStackNavigator}
