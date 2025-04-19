@@ -8,6 +8,8 @@ import authRouter from './routes/auth'; // Import the auth router
 import accountsRouter from './routes/accounts'; // Import the accounts router
 import devicesRouter from './routes/devices'; // Import the devices router
 import adminRouter from './routes/admin'; // Import the admin router
+// Import Swagger setup
+const { setupSwagger } = require('./utils/swagger');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -18,6 +20,9 @@ app.use(express.json()); // Middleware to parse JSON bodies
 app.get('/', (req: Request, res: Response) => {
   res.send('2FLocal Backend is running!');
 });
+
+// Setup Swagger UI
+setupSwagger(app);
 
 // --- Apply API Rate Limiting ---
 // This applies a general rate limit to all API routes
@@ -63,6 +68,7 @@ async function main(): Promise<void> { // Explicit return type
   console.log('Starting server...');
   const server = app.listen(port, () => {
     console.log(`Server listening on http://localhost:${port}`);
+    console.log(`API Documentation available at http://localhost:${port}/api-docs`);
   });
 
   // Handle server errors

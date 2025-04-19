@@ -1,8 +1,11 @@
-openapi: 3.1.0
+openapi: 3.0.0
 info:
   title: 2FLocal API
   description: API for the 2FLocal two-factor authentication application
   version: 1.0.0
+  contact:
+    name: 2FLocal Support
+    email: support@2flocal.com
 servers:
   - url: /api
     description: API base path
@@ -29,11 +32,70 @@ components:
     Error:
       type: object
       properties:
-        message:
-          type: string
-          description: Error message
+        success:
+          type: boolean
+          description: Always false for error responses
+          example: false
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              description: Human-readable error message
+              example: Invalid input parameters
+            statusCode:
+              type: integer
+              description: HTTP status code
+              example: 400
+            code:
+              type: string
+              description: Error code for programmatic handling
+              example: VALIDATION_ERROR
+            details:
+              type: object
+              description: Optional additional information (only in development or for operational errors)
       required:
-        - message
+        - success
+        - error
+    ValidationError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Always false for error responses
+          example: false
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              description: Human-readable error message
+              example: Validation failed
+            statusCode:
+              type: integer
+              description: HTTP status code
+              example: 422
+            code:
+              type: string
+              description: Error code
+              example: VALIDATION_ERROR
+            details:
+              type: array
+              description: List of validation errors
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    description: Field with error
+                    example: email
+                  message:
+                    type: string
+                    description: Error message for the field
+                    example: Email is required
+      required:
+        - success
+        - error
     User:
       type: object
       properties:
@@ -256,6 +318,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
   /auth/login:
     post:
       summary: Login
@@ -301,6 +369,18 @@ paths:
                     $ref: '#/components/schemas/User'
         '401':
           description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many login attempts
           content:
             application/json:
               schema:
@@ -386,6 +466,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many password reset attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /auth/reset-password:
     post:
       summary: Reset password
@@ -425,6 +517,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
   /auth/profile:
     put:
       summary: Update user profile
@@ -480,6 +578,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
   /auth/resend-verification:
     post:
       summary: Resend verification email
@@ -503,6 +607,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many verification email requests
           content:
             application/json:
               schema:
@@ -686,6 +796,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
   /accounts/{id}:
     delete:
       summary: Delete account secret
@@ -744,6 +860,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Account secret not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many TOTP generation requests
           content:
             application/json:
               schema:
@@ -907,6 +1029,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
   /devices/{id}:
     parameters:
       - name: id
@@ -957,6 +1085,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
     delete:
       summary: Delete device
       description: Delete a device for the authenticated user
@@ -1019,6 +1153,50 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Device not found or does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+  /admin/devices/{id}:
+    delete:
+      summary: Admin delete device
+      description: Delete a device by ID (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Device ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Device deleted successfully
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - requires admin privileges
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Device not found
           content:
             application/json:
               schema:

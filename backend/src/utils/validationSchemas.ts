@@ -5,7 +5,8 @@
  * These schemas ensure that all input data is properly validated before processing.
  */
 
-import expressValidator from 'express-validator';
+// @ts-ignore
+const expressValidator = require('express-validator');
 const { body, param, query } = expressValidator;
 
 // --- Auth Validation Schemas ---

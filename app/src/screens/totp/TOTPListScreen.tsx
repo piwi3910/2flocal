@@ -207,7 +207,7 @@ const TOTPListScreen: React.FC = () => {
     if (isLoading) {
       return (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0066CC" />
+          <ActivityIndicator size="large" color="#0066CC" testID="loading-indicator" />
         </View>
       );
     }

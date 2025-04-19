@@ -45,16 +45,21 @@ describe('Token Service', () => {
       // Arrange
       const mockToken = 'mockToken';
       jest.spyOn(tokenService, 'generateToken').mockReturnValue(mockToken);
-      const mockDate = new Date('2025-04-19T08:00:00Z');
-      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
-
+      
+      // Mock Date.now instead of the Date constructor
+      const mockTimestamp = 1713600000000; // 2025-04-19T08:00:00Z in milliseconds
+      jest.spyOn(Date, 'now').mockReturnValue(mockTimestamp);
+      
       // Act
       const result = tokenService.generatePasswordResetToken();
 
       // Assert
       expect(tokenService.generateToken).toHaveBeenCalled();
       expect(result.token).toBe(mockToken);
-      expect(result.expires).toEqual(new Date('2025-04-19T09:00:00Z')); // 1 hour later
+      
+      // Expected expiry is 1 hour (3600000 ms) later
+      const expectedExpiry = new Date(mockTimestamp + 3600000);
+      expect(result.expires).toEqual(expectedExpiry);
     });
   });
 
@@ -129,8 +134,9 @@ describe('Token Service', () => {
       jest.spyOn(tokenService, 'hashToken').mockReturnValue(mockTokenHash);
       (crypto.randomUUID as jest.Mock).mockReturnValue(mockUuid);
       
-      const mockDate = new Date('2025-04-19T08:00:00Z');
-      jest.spyOn(global, 'Date').mockImplementation(() => mockDate);
+      // Mock Date.now instead of the Date constructor
+      const mockTimestamp = 1713600000000; // 2025-04-19T08:00:00Z in milliseconds
+      jest.spyOn(Date, 'now').mockReturnValue(mockTimestamp);
       
       prismaMock.$executeRaw.mockResolvedValue(1);
 
@@ -142,7 +148,10 @@ describe('Token Service', () => {
       expect(tokenService.hashToken).toHaveBeenCalledWith(mockToken);
       expect(prismaMock.$executeRaw).toHaveBeenCalled();
       expect(result.token).toBe(mockToken);
-      expect(result.expiresAt).toEqual(new Date('2025-04-26T08:00:00Z')); // 7 days later
+      
+      // Expected expiry is 7 days (604800000 ms) later
+      const expectedExpiry = new Date(mockTimestamp + 604800000);
+      expect(result.expiresAt).toEqual(expectedExpiry);
     });
   });
 

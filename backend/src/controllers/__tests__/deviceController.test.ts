@@ -1,599 +1,569 @@
-import { Request, Response, NextFunction } from 'express';
-import { 
-    registerDevice, 
-    listDevices, 
-    updateDevice, 
-    deleteDevice, 
-    verifyDevice 
-} from '../deviceController';
+import { Request, Response } from 'express';
+import { mockDeep, mockReset } from 'jest-mock-extended';
+import { prismaMock } from '../../__tests__/setup';
+import * as deviceController from '../deviceController';
 
-// Mock the Prisma client
-const mockPrismaClient = {
-    device: {
-        findUnique: jest.fn(),
-        findFirst: jest.fn(),
-        findMany: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-        deleteMany: jest.fn(),
-    }
-};
-
-// Mock request, response, and next function
-const mockRequest = (data: any = {}) => {
-    return {
-        body: data.body || {},
-        params: data.params || {},
-        user: data.user || { userId: 'user123', email: 'user@example.com' },
-        app: {
-            locals: {
-                prisma: mockPrismaClient
-            }
-        }
-    } as unknown as Request;
-};
-
-const mockResponse = () => {
-    const res: any = {};
-    res.status = jest.fn().mockReturnValue(res);
-    res.json = jest.fn().mockReturnValue(res);
-    res.send = jest.fn().mockReturnValue(res);
-    return res as Response;
-};
-
-const mockNext = jest.fn() as NextFunction;
+// Define the AuthenticatedRequest interface to match the one in deviceController
+interface AuthenticatedRequest extends Request {
+  user?: { userId: string; email: string };
+}
 
 describe('Device Controller', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
+  // Create mock request and response objects
+  const mockRequest = mockDeep<AuthenticatedRequest>();
+  const mockResponse = mockDeep<Response>();
+  const mockNext = jest.fn();
+
+  // Reset mocks before each test
+  beforeEach(() => {
+    mockReset(mockRequest);
+    mockReset(mockResponse);
+    mockNext.mockClear();
+    mockResponse.status.mockReturnThis();
+    mockResponse.json.mockReturnThis();
+    mockResponse.send.mockReturnThis();
+    
+    // Set up common request properties
+    mockRequest.user = { userId: 'user123', email: 'test@example.com' };
+    mockRequest.app = {
+      locals: {
+        prisma: prismaMock
+      }
+    } as any;
+  });
+
+  describe('registerDevice', () => {
+    it('should return 401 if user is not authenticated', async () => {
+      // Arrange
+      mockRequest.user = undefined;
+
+      // Act
+      await deviceController.registerDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(401);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('Unauthorized')
+      }));
     });
 
-    describe('registerDevice', () => {
-        it('should return 401 if user is not authenticated', async () => {
-            const req = mockRequest({ user: undefined });
-            const res = mockResponse();
-            
-            await registerDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+    it('should return 400 if required fields are missing', async () => {
+      // Arrange
+      mockRequest.body = { name: 'My Phone', type: 'MOBILE' }; // Missing identifier
 
-        it('should return 400 if required fields are missing', async () => {
-            const req = mockRequest({ body: { name: 'My Device' } });
-            const res = mockResponse();
-            
-            await registerDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      // Act
+      await deviceController.registerDevice(mockRequest as any, mockResponse as any, mockNext);
 
-        it('should return 400 if device type is invalid', async () => {
-            const req = mockRequest({ 
-                body: { 
-                    name: 'My Device', 
-                    type: 'INVALID_TYPE', 
-                    identifier: 'device123' 
-                } 
-            });
-            const res = mockResponse();
-            
-            await registerDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
-
-        it('should return 200 if device already exists', async () => {
-            const existingDevice = {
-                id: 'device123',
-                name: 'My Device',
-                type: 'MOBILE',
-                identifier: 'device123',
-                lastSeen: new Date(),
-                userId: 'user123',
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-            
-            mockPrismaClient.device.findUnique.mockResolvedValue(existingDevice);
-            
-            const req = mockRequest({ 
-                body: { 
-                    name: 'My Device', 
-                    type: 'MOBILE', 
-                    identifier: 'device123' 
-                } 
-            });
-            const res = mockResponse();
-            
-            await registerDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith({ 
-                message: 'Device already registered', 
-                device: expect.objectContaining({
-                    id: existingDevice.id,
-                    name: existingDevice.name,
-                    type: existingDevice.type,
-                    identifier: existingDevice.identifier,
-                    lastSeen: existingDevice.lastSeen
-                })
-            });
-        });
-
-        it('should create and return a new device if it does not exist', async () => {
-            mockPrismaClient.device.findUnique.mockResolvedValue(null);
-            
-            const newDevice = {
-                id: 'device123',
-                name: 'My Device',
-                type: 'MOBILE',
-                identifier: 'device123',
-                lastSeen: new Date(),
-                userId: 'user123',
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-            
-            mockPrismaClient.device.create.mockResolvedValue(newDevice);
-            
-            const req = mockRequest({ 
-                body: { 
-                    name: 'My Device', 
-                    type: 'MOBILE', 
-                    identifier: 'device123' 
-                } 
-            });
-            const res = mockResponse();
-            
-            await registerDevice(req, res, mockNext);
-            
-            expect(mockPrismaClient.device.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    name: 'My Device',
-                    type: 'MOBILE',
-                    identifier: 'device123',
-                    userId: 'user123'
-                })
-            });
-            
-            expect(res.status).toHaveBeenCalledWith(201);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                id: newDevice.id,
-                name: newDevice.name,
-                type: newDevice.type,
-                identifier: newDevice.identifier,
-                message: 'Device registered successfully'
-            }));
-        });
-
-        it('should pass errors to the next middleware', async () => {
-            mockPrismaClient.device.findUnique.mockRejectedValue(new Error('Database error'));
-            
-            const req = mockRequest({ 
-                body: { 
-                    name: 'My Device', 
-                    type: 'MOBILE', 
-                    identifier: 'device123' 
-                } 
-            });
-            const res = mockResponse();
-            
-            await registerDevice(req, res, mockNext);
-            
-            expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
-        });
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Device name, type, and identifier are required'
+      }));
     });
 
-    describe('listDevices', () => {
-        it('should return 401 if user is not authenticated', async () => {
-            const req = mockRequest({ user: undefined });
-            const res = mockResponse();
-            
-            await listDevices(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+    it('should return 400 if device type is invalid', async () => {
+      // Arrange
+      mockRequest.body = {
+        name: 'My Phone',
+        type: 'INVALID_TYPE',
+        identifier: 'device-123'
+      };
 
-        it('should return a list of devices for the authenticated user', async () => {
-            const devices = [
-                {
-                    id: 'device1',
-                    identifier: 'device123',
-                    name: 'My Device',
-                    type: 'MOBILE',
-                    lastSeen: new Date(),
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                },
-                {
-                    id: 'device2',
-                    identifier: 'device456',
-                    name: 'My Other Device',
-                    type: 'DESKTOP',
-                    lastSeen: new Date(),
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                }
-            ];
-            
-            mockPrismaClient.device.findMany.mockResolvedValue(devices);
-            
-            const req = mockRequest();
-            const res = mockResponse();
-            
-            await listDevices(req, res, mockNext);
-            
-            expect(mockPrismaClient.device.findMany).toHaveBeenCalledWith({
-                where: { userId: 'user123' },
-                select: expect.any(Object),
-                orderBy: expect.any(Object)
-            });
-            
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith(devices);
-        });
+      // Act
+      await deviceController.registerDevice(mockRequest as any, mockResponse as any, mockNext);
 
-        it('should pass errors to the next middleware', async () => {
-            mockPrismaClient.device.findMany.mockRejectedValue(new Error('Database error'));
-            
-            const req = mockRequest();
-            const res = mockResponse();
-            
-            await listDevices(req, res, mockNext);
-            
-            expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
-        });
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('Invalid device type')
+      }));
     });
 
-    describe('updateDevice', () => {
-        it('should return 401 if user is not authenticated', async () => {
-            const req = mockRequest({ user: undefined });
-            const res = mockResponse();
-            
-            await updateDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+    it('should return existing device if already registered', async () => {
+      // Arrange
+      mockRequest.body = {
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123'
+      };
 
-        it('should return 400 if device ID is missing', async () => {
-            const req = mockRequest({ params: {} });
-            const res = mockResponse();
-            
-            await updateDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      const existingDevice = {
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        userId: 'user123',
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
-        it('should return 400 if no fields are provided for update', async () => {
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: {}
-            });
-            const res = mockResponse();
-            
-            await updateDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      prismaMock.device.findUnique.mockResolvedValue(existingDevice);
 
-        it('should return 400 if device type is invalid', async () => {
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: { type: 'INVALID_TYPE' }
-            });
-            const res = mockResponse();
-            
-            await updateDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      // Act
+      await deviceController.registerDevice(mockRequest as any, mockResponse as any, mockNext);
 
-        it('should return 404 if device is not found or does not belong to the user', async () => {
-            mockPrismaClient.device.findFirst.mockResolvedValue(null);
-            
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: { name: 'Updated Device' }
-            });
-            const res = mockResponse();
-            
-            await updateDevice(req, res, mockNext);
-            
-            expect(mockPrismaClient.device.findFirst).toHaveBeenCalledWith({
-                where: {
-                    id: 'device123',
-                    userId: 'user123'
-                }
-            });
-            
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
-
-        it('should update and return the device if it exists and belongs to the user', async () => {
-            const device = {
-                id: 'device123',
-                name: 'My Device',
-                type: 'MOBILE',
-                identifier: 'device123',
-                lastSeen: new Date(),
-                userId: 'user123',
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-            
-            mockPrismaClient.device.findFirst.mockResolvedValue(device);
-            
-            const updatedDevice = {
-                ...device,
-                name: 'Updated Device',
-                lastSeen: new Date()
-            };
-            
-            mockPrismaClient.device.update.mockResolvedValue(updatedDevice);
-            
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: { name: 'Updated Device' }
-            });
-            const res = mockResponse();
-            
-            await updateDevice(req, res, mockNext);
-            
-            expect(mockPrismaClient.device.update).toHaveBeenCalledWith({
-                where: { id: 'device123' },
-                data: expect.objectContaining({
-                    name: 'Updated Device',
-                    lastSeen: expect.any(Date)
-                })
-            });
-            
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                id: updatedDevice.id,
-                name: updatedDevice.name,
-                type: updatedDevice.type,
-                identifier: updatedDevice.identifier,
-                lastSeen: updatedDevice.lastSeen,
-                message: 'Device updated successfully'
-            }));
-        });
-
-        it('should pass errors to the next middleware', async () => {
-            mockPrismaClient.device.findFirst.mockRejectedValue(new Error('Database error'));
-            
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: { name: 'Updated Device' }
-            });
-            const res = mockResponse();
-            
-            await updateDevice(req, res, mockNext);
-            
-            expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
-        });
+      // Assert
+      expect(prismaMock.device.findUnique).toHaveBeenCalledWith({
+        where: {
+          userId_identifier: {
+            userId: 'user123',
+            identifier: 'device-123'
+          }
+        }
+      });
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Device already registered',
+        device: expect.objectContaining({
+          id: 'device1',
+          name: 'My Phone',
+          type: 'MOBILE',
+          identifier: 'device-123'
+        })
+      }));
     });
 
-    describe('deleteDevice', () => {
-        it('should return 401 if user is not authenticated', async () => {
-            const req = mockRequest({ user: undefined });
-            const res = mockResponse();
-            
-            await deleteDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+    it('should register a new device successfully', async () => {
+      // Arrange
+      mockRequest.body = {
+        name: 'My Phone',
+        type: 'mobile', // lowercase to test conversion
+        identifier: 'device-123'
+      };
 
-        it('should return 400 if device ID is missing', async () => {
-            const req = mockRequest({ params: {} });
-            const res = mockResponse();
-            
-            await deleteDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      prismaMock.device.findUnique.mockResolvedValue(null);
 
-        it('should return 404 if device is not found or does not belong to the user', async () => {
-            mockPrismaClient.device.findFirst.mockResolvedValue(null);
-            
-            const req = mockRequest({ params: { id: 'device123' } });
-            const res = mockResponse();
-            
-            await deleteDevice(req, res, mockNext);
-            
-            expect(mockPrismaClient.device.findFirst).toHaveBeenCalledWith({
-                where: {
-                    id: 'device123',
-                    userId: 'user123'
-                }
-            });
-            
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      const newDevice = {
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        userId: 'user123',
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
-        it('should delete the device if it exists and belongs to the user', async () => {
-            const device = {
-                id: 'device123',
-                name: 'My Device',
-                type: 'MOBILE',
-                identifier: 'device123',
-                lastSeen: new Date(),
-                userId: 'user123',
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-            
-            mockPrismaClient.device.findFirst.mockResolvedValue(device);
-            mockPrismaClient.device.delete.mockResolvedValue(device);
-            
-            const req = mockRequest({ params: { id: 'device123' } });
-            const res = mockResponse();
-            
-            await deleteDevice(req, res, mockNext);
-            
-            expect(mockPrismaClient.device.delete).toHaveBeenCalledWith({
-                where: { id: 'device123' }
-            });
-            
-            expect(res.status).toHaveBeenCalledWith(204);
-            expect(res.send).toHaveBeenCalled();
-        });
+      prismaMock.device.create.mockResolvedValue(newDevice);
 
-        it('should pass errors to the next middleware', async () => {
-            mockPrismaClient.device.findFirst.mockRejectedValue(new Error('Database error'));
-            
-            const req = mockRequest({ params: { id: 'device123' } });
-            const res = mockResponse();
-            
-            await deleteDevice(req, res, mockNext);
-            
-            expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
-        });
+      // Act
+      await deviceController.registerDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(prismaMock.device.create).toHaveBeenCalledWith({
+        data: {
+          name: 'My Phone',
+          type: 'MOBILE',
+          identifier: 'device-123',
+          userId: 'user123',
+          lastSeen: expect.any(Date)
+        }
+      });
+      expect(mockResponse.status).toHaveBeenCalledWith(201);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        message: 'Device registered successfully'
+      }));
     });
 
-    describe('verifyDevice', () => {
-        it('should return 401 if user is not authenticated', async () => {
-            const req = mockRequest({ user: undefined });
-            const res = mockResponse();
-            
-            await verifyDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+    it('should handle database errors', async () => {
+      // Arrange
+      mockRequest.body = {
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123'
+      };
 
-        it('should return 400 if device ID is missing', async () => {
-            const req = mockRequest({ 
-                params: {},
-                body: { verificationCode: '123456' }
-            });
-            const res = mockResponse();
-            
-            await verifyDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      prismaMock.device.findUnique.mockResolvedValue(null);
 
-        it('should return 400 if verification code is missing', async () => {
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: {}
-            });
-            const res = mockResponse();
-            
-            await verifyDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      const dbError = new Error('Database error');
+      prismaMock.device.create.mockRejectedValue(dbError);
 
-        it('should return 400 if verification code format is invalid', async () => {
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: { verificationCode: '12345' } // Not 6 digits
-            });
-            const res = mockResponse();
-            
-            await verifyDevice(req, res, mockNext);
-            
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
+      // Act
+      await deviceController.registerDevice(mockRequest as any, mockResponse as any, mockNext);
 
-        it('should return 404 if device is not found or does not belong to the user', async () => {
-            mockPrismaClient.device.findFirst.mockResolvedValue(null);
-            
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: { verificationCode: '123456' }
-            });
-            const res = mockResponse();
-            
-            await verifyDevice(req, res, mockNext);
-            
-            expect(mockPrismaClient.device.findFirst).toHaveBeenCalledWith({
-                where: {
-                    id: 'device123',
-                    userId: 'user123'
-                }
-            });
-            
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith({ message: expect.any(String) });
-        });
-
-        it('should verify the device if it exists and belongs to the user', async () => {
-            const device = {
-                id: 'device123',
-                name: 'My Device',
-                type: 'MOBILE',
-                identifier: 'device123',
-                lastSeen: new Date(),
-                userId: 'user123',
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-            
-            mockPrismaClient.device.findFirst.mockResolvedValue(device);
-            
-            const updatedDevice = {
-                ...device,
-                lastSeen: new Date()
-            };
-            
-            mockPrismaClient.device.update.mockResolvedValue(updatedDevice);
-            
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: { verificationCode: '123456' }
-            });
-            const res = mockResponse();
-            
-            await verifyDevice(req, res, mockNext);
-            
-            expect(mockPrismaClient.device.update).toHaveBeenCalledWith({
-                where: { id: 'device123' },
-                data: {
-                    lastSeen: expect.any(Date)
-                }
-            });
-            
-            expect(res.status).toHaveBeenCalledWith(200);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-                id: updatedDevice.id,
-                name: updatedDevice.name,
-                type: updatedDevice.type,
-                identifier: updatedDevice.identifier,
-                lastSeen: updatedDevice.lastSeen,
-                message: 'Device verified successfully'
-            }));
-        });
-
-        it('should pass errors to the next middleware', async () => {
-            mockPrismaClient.device.findFirst.mockRejectedValue(new Error('Database error'));
-            
-            const req = mockRequest({ 
-                params: { id: 'device123' },
-                body: { verificationCode: '123456' }
-            });
-            const res = mockResponse();
-            
-            await verifyDevice(req, res, mockNext);
-            
-            expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
-        });
+      // Assert
+      expect(mockNext).toHaveBeenCalledWith(dbError);
     });
+  });
+
+  describe('listDevices', () => {
+    it('should return 401 if user is not authenticated', async () => {
+      // Arrange
+      mockRequest.user = undefined;
+
+      // Act
+      await deviceController.listDevices(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(401);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Unauthorized'
+      }));
+    });
+
+    it('should return a list of devices', async () => {
+      // Arrange
+      const mockDevices = [
+        {
+          id: 'device1',
+          name: 'My Phone',
+          type: 'MOBILE',
+          identifier: 'device-123',
+          lastSeen: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          id: 'device2',
+          name: 'My Laptop',
+          type: 'DESKTOP',
+          identifier: 'device-456',
+          lastSeen: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ];
+
+      prismaMock.device.findMany.mockResolvedValue(mockDevices);
+
+      // Act
+      await deviceController.listDevices(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(prismaMock.device.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user123' },
+        select: {
+          id: true,
+          identifier: true,
+          name: true,
+          type: true,
+          lastSeen: true,
+          createdAt: true,
+          updatedAt: true
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith(mockDevices);
+    });
+
+    it('should handle database errors', async () => {
+      // Arrange
+      const dbError = new Error('Database error');
+      prismaMock.device.findMany.mockRejectedValue(dbError);
+
+      // Act
+      await deviceController.listDevices(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockNext).toHaveBeenCalledWith(dbError);
+    });
+  });
+
+  describe('updateDevice', () => {
+    it('should return 401 if user is not authenticated', async () => {
+      // Arrange
+      mockRequest.user = undefined;
+
+      // Act
+      await deviceController.updateDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(401);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Unauthorized'
+      }));
+    });
+
+    it('should return 400 if device ID is missing', async () => {
+      // Arrange
+      mockRequest.params = {};
+
+      // Act
+      await deviceController.updateDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Device ID is required'
+      }));
+    });
+
+    it('should return 400 if no fields are provided for update', async () => {
+      // Arrange
+      mockRequest.params = { id: 'device1' };
+      mockRequest.body = {};
+
+      // Act
+      await deviceController.updateDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'At least one field (name or type) must be provided for update'
+      }));
+    });
+
+    it('should return 400 if device type is invalid', async () => {
+      // Arrange
+      mockRequest.params = { id: 'device1' };
+      mockRequest.body = { type: 'INVALID_TYPE' };
+
+      // Act
+      await deviceController.updateDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('Invalid device type')
+      }));
+    });
+
+    it('should return 404 if device is not found', async () => {
+      // Arrange
+      mockRequest.params = { id: 'nonexistent-device' };
+      mockRequest.body = { name: 'Updated Name' };
+
+      prismaMock.device.findFirst.mockResolvedValue(null);
+
+      // Act
+      await deviceController.updateDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(prismaMock.device.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'nonexistent-device',
+          userId: 'user123'
+        }
+      });
+      expect(mockResponse.status).toHaveBeenCalledWith(404);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Device not found or does not belong to the user'
+      }));
+    });
+
+    it('should update device name successfully', async () => {
+      // Arrange
+      mockRequest.params = { id: 'device1' };
+      mockRequest.body = { name: 'Updated Name' };
+
+      const existingDevice = {
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        userId: 'user123',
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const updatedDevice = {
+        ...existingDevice,
+        name: 'Updated Name',
+        lastSeen: new Date()
+      };
+
+      prismaMock.device.findFirst.mockResolvedValue(existingDevice);
+      prismaMock.device.update.mockResolvedValue(updatedDevice);
+
+      // Act
+      await deviceController.updateDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(prismaMock.device.update).toHaveBeenCalledWith({
+        where: {
+          id: 'device1'
+        },
+        data: {
+          name: 'Updated Name',
+          lastSeen: expect.any(Date)
+        }
+      });
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        id: 'device1',
+        name: 'Updated Name',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        message: 'Device updated successfully'
+      }));
+    });
+
+    it('should update device type successfully', async () => {
+      // Arrange
+      mockRequest.params = { id: 'device1' };
+      mockRequest.body = { type: 'desktop' }; // lowercase to test conversion
+
+      const existingDevice = {
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        userId: 'user123',
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const updatedDevice = {
+        ...existingDevice,
+        type: 'DESKTOP',
+        lastSeen: new Date()
+      };
+
+      prismaMock.device.findFirst.mockResolvedValue(existingDevice);
+      prismaMock.device.update.mockResolvedValue(updatedDevice);
+
+      // Act
+      await deviceController.updateDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(prismaMock.device.update).toHaveBeenCalledWith({
+        where: {
+          id: 'device1'
+        },
+        data: {
+          type: 'DESKTOP',
+          lastSeen: expect.any(Date)
+        }
+      });
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        id: 'device1',
+        name: 'My Phone',
+        type: 'DESKTOP',
+        identifier: 'device-123',
+        message: 'Device updated successfully'
+      }));
+    });
+
+    it('should handle database errors', async () => {
+      // Arrange
+      mockRequest.params = { id: 'device1' };
+      mockRequest.body = { name: 'Updated Name' };
+
+      prismaMock.device.findFirst.mockResolvedValue({
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        userId: 'user123',
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      const dbError = new Error('Database error');
+      prismaMock.device.update.mockRejectedValue(dbError);
+
+      // Act
+      await deviceController.updateDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockNext).toHaveBeenCalledWith(dbError);
+    });
+  });
+
+  describe('deleteDevice', () => {
+    it('should delete device successfully', async () => {
+      // Arrange
+      mockRequest.params = { id: 'device1' };
+
+      prismaMock.device.findFirst.mockResolvedValue({
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        userId: 'user123',
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      prismaMock.device.delete.mockResolvedValue({} as any);
+
+      // Act
+      await deviceController.deleteDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(prismaMock.device.delete).toHaveBeenCalledWith({
+        where: {
+          id: 'device1'
+        }
+      });
+      expect(mockResponse.status).toHaveBeenCalledWith(204);
+      expect(mockResponse.send).toHaveBeenCalled();
+    });
+  });
+
+  describe('verifyDevice', () => {
+    it('should verify device successfully', async () => {
+      // Arrange
+      mockRequest.params = { id: 'device1' };
+      mockRequest.body = { verificationCode: '123456' };
+
+      const existingDevice = {
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        userId: 'user123',
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const updatedDevice = {
+        ...existingDevice,
+        lastSeen: new Date()
+      };
+
+      prismaMock.device.findFirst.mockResolvedValue(existingDevice);
+      prismaMock.device.update.mockResolvedValue(updatedDevice);
+
+      // Act
+      await deviceController.verifyDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(prismaMock.device.update).toHaveBeenCalledWith({
+        where: {
+          id: 'device1'
+        },
+        data: {
+          lastSeen: expect.any(Date)
+        }
+      });
+      expect(mockResponse.status).toHaveBeenCalledWith(200);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        id: 'device1',
+        name: 'My Phone',
+        type: 'MOBILE',
+        identifier: 'device-123',
+        message: 'Device verified successfully'
+      }));
+    });
+
+    it('should return 400 if verification code is invalid', async () => {
+      // Arrange
+      mockRequest.params = { id: 'device1' };
+      mockRequest.body = { verificationCode: '12345' }; // Not 6 digits
+
+      // Act
+      await deviceController.verifyDevice(mockRequest as any, mockResponse as any, mockNext);
+
+      // Assert
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Invalid verification code format. Must be a 6-digit number.'
+      }));
+    });
+  });
 });

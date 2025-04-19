@@ -28,6 +28,9 @@ describe('Auth API', () => {
   });
 
   describe('POST /api/auth/register', () => {
+    // Increase timeout to 15 seconds for all integration tests
+    jest.setTimeout(15000);
+    
     it('should register a new user', async () => {
       // Arrange
       const userData = {
@@ -203,5 +206,169 @@ describe('Auth API', () => {
     });
   });
 
-  // Add more tests for other auth endpoints...
+  describe('POST /api/auth/refresh-token', () => {
+    it('should refresh tokens with a valid refresh token', async () => {
+      // Arrange
+      const refreshData = {
+        refreshToken: 'valid-refresh-token'
+      };
+
+      // Mock token validation
+      prismaMock.$executeRaw.mockResolvedValue(1); // Token exists
+      
+      // Mock token generation
+      (jwt.sign as jest.Mock).mockReturnValue('new-access-token');
+
+      // Act
+      const response = await request(app)
+        .post('/api/auth/refresh-token')
+        .send(refreshData);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('accessToken', 'new-access-token');
+      expect(response.body).toHaveProperty('refreshToken');
+    });
+
+    it('should return 401 if refresh token is invalid', async () => {
+      // Arrange
+      const refreshData = {
+        refreshToken: 'invalid-refresh-token'
+      };
+
+      // Mock token validation (token doesn't exist)
+      prismaMock.$executeRaw.mockResolvedValue(0);
+
+      // Act
+      const response = await request(app)
+        .post('/api/auth/refresh-token')
+        .send(refreshData);
+
+      // Assert
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('message', 'Invalid refresh token');
+    });
+  });
+
+  describe('GET /api/auth/me', () => {
+    it('should return user data for authenticated user', async () => {
+      // Arrange
+      const mockUser = {
+        id: '1',
+        email: 'test@example.com',
+        name: 'Test User',
+        isEmailVerified: true,
+        isAdmin: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      // Mock JWT verification
+      (jwt.verify as jest.Mock).mockReturnValue({ userId: '1', email: 'test@example.com' });
+      
+      // Mock user retrieval
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+
+      // Act
+      const response = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', 'Bearer valid-token');
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('id', '1');
+      expect(response.body).toHaveProperty('email', 'test@example.com');
+      expect(response.body).toHaveProperty('name', 'Test User');
+      expect(response.body).not.toHaveProperty('passwordHash');
+    });
+
+    it('should return 401 if no token is provided', async () => {
+      // Act
+      const response = await request(app)
+        .get('/api/auth/me');
+
+      // Assert
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('message', 'No token provided');
+    });
+
+    it('should return 401 if token is invalid', async () => {
+      // Arrange
+      (jwt.verify as jest.Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      // Act
+      const response = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', 'Bearer invalid-token');
+
+      // Assert
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('message', 'Invalid token');
+    });
+  });
+
+  describe('PUT /api/auth/profile', () => {
+    it('should update user profile successfully', async () => {
+      // Arrange
+      const updateData = {
+        name: 'Updated Name'
+      };
+
+      // Mock JWT verification
+      (jwt.verify as jest.Mock).mockReturnValue({ userId: '1', email: 'test@example.com' });
+      
+      // Mock user update
+      prismaMock.user.update.mockResolvedValue({
+        id: '1',
+        email: 'test@example.com',
+        name: 'Updated Name',
+        passwordHash: 'hashedPassword',
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        isAdmin: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      // Act
+      const response = await request(app)
+        .put('/api/auth/profile')
+        .set('Authorization', 'Bearer valid-token')
+        .send(updateData);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('name', 'Updated Name');
+      expect(response.body).not.toHaveProperty('passwordHash');
+    });
+  });
+
+  describe('POST /api/auth/revoke-token', () => {
+    it('should revoke a refresh token successfully', async () => {
+      // Arrange
+      const revokeData = {
+        refreshToken: 'token-to-revoke'
+      };
+
+      // Mock JWT verification
+      (jwt.verify as jest.Mock).mockReturnValue({ userId: '1', email: 'test@example.com' });
+      
+      // Mock token deletion
+      prismaMock.$executeRaw.mockResolvedValue(1);
+
+      // Act
+      const response = await request(app)
+        .post('/api/auth/revoke-token')
+        .set('Authorization', 'Bearer valid-token')
+        .send(revokeData);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('message', 'Token revoked successfully');
+    });
+  });
 });

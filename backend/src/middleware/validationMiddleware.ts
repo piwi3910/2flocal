@@ -6,7 +6,11 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { validationResult, ValidationChain } from 'express-validator';
+// @ts-ignore
+const expressValidator = require('express-validator');
+const { validationResult } = expressValidator;
+// Define ValidationChain type
+type ValidationChain = any;
 import { ValidationError } from '../utils/errors';
 
 /**
@@ -28,7 +32,7 @@ export const validate = (validations: ValidationChain[]) => {
     }
 
     // Format validation errors
-    const formattedErrors = errors.array().map(error => ({
+    const formattedErrors = errors.array().map((error: any) => ({
       field: error.param,
       message: error.msg,
       value: error.value

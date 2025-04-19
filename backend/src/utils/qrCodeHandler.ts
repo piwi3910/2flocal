@@ -114,8 +114,9 @@ export const parseTOTPUri = (uri: string): {
     const url = new URL(uri);
     
     // Get the type (totp or hotp)
-    const type = url.protocol.replace('otpauth:', '').replace(/\//g, '');
+    let type = url.protocol.replace('otpauth:', '').replace(/\//g, '');
     
+    // Check if the type is supported (only totp is supported)
     if (type !== 'totp') {
       throw new Error(`Unsupported OTP type: ${type}`);
     }
