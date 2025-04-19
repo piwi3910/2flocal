@@ -1,0 +1,32 @@
+# Exclude node_modules
+node_modules
+
+# Exclude development and test files
+.env
+.env.test
+*.log
+coverage
+__tests__
+**/*.test.ts
+**/*.spec.ts
+
+# Exclude version control files
+.git
+.gitignore
+
+# Exclude documentation
+docs
+*.md
+
+# Exclude build artifacts
+dist
+
+# Exclude editor configs
+.vscode
+.idea
+*.swp
+*.swo
+
+# Exclude other unnecessary files
+.DS_Store
+npm-debug.log

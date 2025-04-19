@@ -1,0 +1,42 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build and upload to Play Store Internal Testing"
+  lane :internal do
+    gradle(
+      task: "clean assembleRelease",
+      project_dir: "."
+    )
+    upload_to_play_store(
+      track: 'internal',
+      release_status: 'completed',
+      aab: "./app/build/outputs/bundle/release/app-release.aab"
+    )
+  end
+
+  desc "Build and upload to Play Store Beta"
+  lane :beta do
+    gradle(
+      task: "clean assembleRelease",
+      project_dir: "."
+    )
+    upload_to_play_store(
+      track: 'beta',
+      release_status: 'completed',
+      aab: "./app/build/outputs/bundle/release/app-release.aab"
+    )
+  end
+
+  desc "Build and upload to Play Store Production"
+  lane :production do
+    gradle(
+      task: "clean assembleRelease",
+      project_dir: "."
+    )
+    upload_to_play_store(
+      track: 'production',
+      release_status: 'completed',
+      aab: "./app/build/outputs/bundle/release/app-release.aab"
+    )
+  end
+end

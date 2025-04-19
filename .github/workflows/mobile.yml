@@ -1,0 +1,177 @@
+name: Mobile CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies
+        run: cd app && npm ci
+      - name: Run linting
+        run: cd app && npm run lint
+      - name: Run tests
+        run: cd app && npm test
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-coverage
+          path: app/coverage
+
+  build-android:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies
+        run: cd app && npm ci
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Build Android
+        run: cd app/android && ./gradlew assembleRelease
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release
+          path: app/android/app/build/outputs/apk/release/app-release.apk
+      - name: Run security scan
+        run: |
+          # Run security scan on the APK
+          echo "Running security scan on APK..."
+          # This would be replaced with an actual security scanning tool
+
+  build-ios:
+    needs: test
+    runs-on: macos-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies
+        run: cd app && npm ci
+      - name: Install Cocoapods
+        run: cd app/ios && pod install
+      - name: Build iOS
+        run: |
+          cd app/ios
+          xcodebuild -workspace TwoFLocal.xcworkspace -scheme TwoFLocal -configuration Release -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 14' build
+      - name: Upload IPA
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-build
+          path: app/ios/build/Build/Products/Release-iphonesimulator/TwoFLocal.app
+
+  e2e-tests:
+    needs: [build-android, build-ios]
+    runs-on: macos-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies
+        run: cd app && npm ci
+      - name: Install Detox CLI
+        run: npm install -g detox-cli
+      - name: Install Cocoapods
+        run: cd app/ios && pod install
+      - name: Build for Detox
+        run: cd app && detox build --configuration ios.sim.release
+      - name: Run E2E Tests
+        run: cd app && detox test --configuration ios.sim.release
+      - name: Upload E2E Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: e2e-test-results
+          path: app/e2e/artifacts
+
+  deploy-testflight:
+    needs: e2e-tests
+    runs-on: macos-latest
+    if: github.event_name == 'push'
+    # Manual approval can be configured in GitHub
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      - name: Install Fastlane
+        run: cd app/ios && gem install fastlane
+      - name: Deploy to TestFlight
+        run: cd app/ios && fastlane beta
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+      - name: Notify deployment status
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: always()
+
+  deploy-play-store:
+    needs: e2e-tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    # Manual approval can be configured in GitHub
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download APK
+        uses: actions/download-artifact@v3
+        with:
+          name: app-release
+          path: app/android/app/build/outputs/apk/release/
+      - name: Deploy to Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          packageName: com.twoflocal
+          releaseFiles: app/android/app/build/outputs/apk/release/app-release.apk
+          track: internal
+          status: completed
+      - name: Notify deployment status
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: always()
