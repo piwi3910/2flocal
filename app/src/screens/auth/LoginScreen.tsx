@@ -34,35 +34,35 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [isBiometricLoading, setIsBiometricLoading] = useState(false);
   const [showBiometricButton, setShowBiometricButton] = useState(false);
   const { login, authenticateWithBiometrics } = useAuth();
-  
+
   // Check if biometric authentication is available and enabled
   useEffect(() => {
     const checkBiometricAuth = async () => {
       try {
         // Check if biometrics are available on the device
         const { available } = await biometricService.isBiometricAvailable();
-        
+
         if (available) {
           // Check if biometrics are enabled for app access
           const enabled = await biometricService.isBiometricsEnabled();
           const appAccessEnabled = await biometricService.isBiometricsForAppAccessEnabled();
-          
+
           setShowBiometricButton(enabled && appAccessEnabled);
         }
       } catch (error) {
         console.error('Error checking biometric authentication:', error);
       }
     };
-    
+
     checkBiometricAuth();
   }, []);
-  
+
   // Handle biometric authentication
   const handleBiometricAuth = async () => {
     try {
       setIsBiometricLoading(true);
       const success = await authenticateWithBiometrics('Unlock 2FLocal');
-      
+
       if (success) {
         // Biometric authentication successful
         // The AuthContext will handle redirecting to the main app
@@ -167,6 +167,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             placeholder="Enter your password"
             secureTextEntry
             error={errors.password}
+            textContentType="password"
+            autoComplete="current-password"
           />
 
           <TouchableOpacity

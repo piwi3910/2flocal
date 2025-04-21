@@ -109,6 +109,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
             placeholder="Create a password"
             secureTextEntry
             error={errors.password}
+            textContentType="newPassword"
+            autoComplete="new-password"
           />
 
           <FormInput
@@ -118,6 +120,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
             placeholder="Confirm your password"
             secureTextEntry
             error={errors.confirmPassword}
+            textContentType="newPassword"
+            autoComplete="new-password"
           />
 
           <FormButton
