@@ -9,8 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listDevices = exports.registerDevice = void 0;
-// --- Register Device --- 
+exports.verifyDevice = exports.deleteDevice = exports.updateDevice = exports.listDevices = exports.registerDevice = void 0;
+// --- Register Device ---
 const registerDevice = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const { name, type, identifier } = req.body;
@@ -85,7 +85,7 @@ const registerDevice = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.registerDevice = registerDevice;
-// --- List Devices --- 
+// --- List Devices ---
 const listDevices = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
@@ -102,6 +102,8 @@ const listDevices = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 id: true,
                 identifier: true,
                 name: true,
+                type: true,
+                lastSeen: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -118,3 +120,174 @@ const listDevices = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.listDevices = listDevices;
+// --- Update Device ---
+const updateDevice = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    const { name, type } = req.body;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+    const prisma = req.app.locals.prisma;
+    if (!userId) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    if (!id) {
+        res.status(400).json({ message: 'Device ID is required' });
+        return;
+    }
+    // Validate input data
+    if (!name && !type) {
+        res.status(400).json({ message: 'At least one field (name or type) must be provided for update' });
+        return;
+    }
+    // Validate device type if provided
+    if (type) {
+        const allowedTypes = ['MOBILE', 'DESKTOP', 'WEB', 'OTHER'];
+        if (!allowedTypes.includes(type.toUpperCase())) {
+            res.status(400).json({ message: `Invalid device type. Allowed types: ${allowedTypes.join(', ')}` });
+            return;
+        }
+    }
+    try {
+        // 1. Check if the device exists and belongs to the user
+        const device = yield prisma.device.findFirst({
+            where: {
+                id,
+                userId
+            }
+        });
+        if (!device) {
+            res.status(404).json({ message: 'Device not found or does not belong to the user' });
+            return;
+        }
+        // 2. Update the device
+        const updatedDevice = yield prisma.device.update({
+            where: {
+                id
+            },
+            data: Object.assign(Object.assign(Object.assign({}, (name && { name })), (type && { type: type.toUpperCase() })), { lastSeen: new Date() // Update lastSeen timestamp
+             })
+        });
+        // 3. Return the updated device
+        res.status(200).json({
+            id: updatedDevice.id,
+            name: updatedDevice.name,
+            type: updatedDevice.type,
+            identifier: updatedDevice.identifier,
+            lastSeen: updatedDevice.lastSeen,
+            message: 'Device updated successfully'
+        });
+    }
+    catch (error) {
+        console.error('Update device error:', error);
+        next(error);
+    }
+});
+exports.updateDevice = updateDevice;
+// --- Delete Device ---
+const deleteDevice = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+    const prisma = req.app.locals.prisma;
+    if (!userId) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    if (!id) {
+        res.status(400).json({ message: 'Device ID is required' });
+        return;
+    }
+    try {
+        // 1. Check if the device exists and belongs to the user
+        const device = yield prisma.device.findFirst({
+            where: {
+                id,
+                userId
+            }
+        });
+        if (!device) {
+            res.status(404).json({ message: 'Device not found or does not belong to the user' });
+            return;
+        }
+        // 2. Delete the device
+        yield prisma.device.delete({
+            where: {
+                id
+            }
+        });
+        // 3. Return success response
+        res.status(204).send();
+    }
+    catch (error) {
+        console.error('Delete device error:', error);
+        next(error);
+    }
+});
+exports.deleteDevice = deleteDevice;
+// --- Verify Device ---
+const verifyDevice = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    const { verificationCode } = req.body;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+    const prisma = req.app.locals.prisma;
+    if (!userId) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    if (!id) {
+        res.status(400).json({ message: 'Device ID is required' });
+        return;
+    }
+    if (!verificationCode) {
+        res.status(400).json({ message: 'Verification code is required' });
+        return;
+    }
+    // For this implementation, we'll use a simple verification code check
+    // In a real-world scenario, you might want to implement a more secure verification process
+    // such as sending a code via email or SMS and verifying it
+    // For demo purposes, we'll accept any 6-digit code
+    const codeRegex = /^\d{6}$/;
+    if (!codeRegex.test(verificationCode)) {
+        res.status(400).json({ message: 'Invalid verification code format. Must be a 6-digit number.' });
+        return;
+    }
+    try {
+        // 1. Check if the device exists and belongs to the user
+        const device = yield prisma.device.findFirst({
+            where: {
+                id,
+                userId
+            }
+        });
+        if (!device) {
+            res.status(404).json({ message: 'Device not found or does not belong to the user' });
+            return;
+        }
+        // 2. Update the device with lastSeen timestamp
+        // In a real implementation, you might want to add a 'verified' field to the Device model
+        const updatedDevice = yield prisma.device.update({
+            where: {
+                id
+            },
+            data: {
+                lastSeen: new Date()
+            }
+        });
+        // 3. Return success response
+        res.status(200).json({
+            id: updatedDevice.id,
+            name: updatedDevice.name,
+            type: updatedDevice.type,
+            identifier: updatedDevice.identifier,
+            lastSeen: updatedDevice.lastSeen,
+            message: 'Device verified successfully'
+        });
+    }
+    catch (error) {
+        console.error('Verify device error:', error);
+        next(error);
+    }
+});
+exports.verifyDevice = verifyDevice;

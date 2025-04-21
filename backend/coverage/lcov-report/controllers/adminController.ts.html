@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/16</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/14</span>
+                <span class='fraction'>14/14</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -110,37 +110,37 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Request, Response, NextFunction } from 'express';
@@ -150,37 +150,37 @@ import { PrismaClient } from '../../prisma/src/generated/prisma';
 // Still good practice to check for req.user existence if needed, though technically redundant.
 &nbsp;
 // --- Admin Delete Device --- 
-export const <span class="cstat-no" title="statement not covered" >adminDeleteDevice = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >a</span>sync (r</span>eq: Request, res: Response, next: NextFunction): Promise&lt;void&gt; =&gt;<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" > {</span></span></span>
-    const { id: deviceId } = <span class="cstat-no" title="statement not covered" >req.params;</span> // Get device primary ID from URL parameters
-    const prisma: PrismaClient = <span class="cstat-no" title="statement not covered" >req.app.locals.prisma;</span> // Get prisma from app.locals
+export const adminDeleteDevice = async (req: Request, res: Response, next: NextFunction): Promise&lt;void&gt; =&gt; {
+    const { id: deviceId } = req.params; // Get device primary ID from URL parameters
+    const prisma: PrismaClient = req.app.locals.prisma; // Get prisma from app.locals
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (!deviceId) {</span>
-<span class="cstat-no" title="statement not covered" >        res.status(400).json({ message: 'Device ID is required in URL parameters' });</span>
-<span class="cstat-no" title="statement not covered" >        return;</span>
+    if (!deviceId) {
+        res.status(400).json({ message: 'Device ID is required in URL parameters' });
+        return;
     }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    try {</span>
+    try {
         // 1. Attempt to delete the device by its primary ID
         // Use deleteMany for consistency and to get a count, or use delete and catch P2025 error
-        const deleteResult = <span class="cstat-no" title="statement not covered" >await prisma.device.deleteMany({</span>
+        const deleteResult = await prisma.device.deleteMany({
             where: {
                 id: deviceId, // Use the primary key 'id'
             },
         });
 &nbsp;
         // 2. Check if a record was actually deleted
-<span class="cstat-no" title="statement not covered" >        <span class="missing-if-branch" title="if path not taken" >I</span>if (deleteResult.count === 0) {</span>
+        if (deleteResult.count === 0) {
             // Device not found with that ID
-<span class="cstat-no" title="statement not covered" >            res.status(404).json({ message: 'Device not found' });</span>
-<span class="cstat-no" title="statement not covered" >            return;</span>
+            res.status(404).json({ message: 'Device not found' });
+            return;
         }
 &nbsp;
         // 3. Return success
-<span class="cstat-no" title="statement not covered" >        res.status(204).send();</span>
+        res.status(204).send();
 &nbsp;
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >        console.error('Admin delete device error:', error);</span>
-<span class="cstat-no" title="statement not covered" >        next(error); </span>// Pass DB errors etc. to generic handler
+        console.error('Admin delete device error:', error);
+        next(error); // Pass DB errors etc. to generic handler
     }
 };
 &nbsp;</pre></td></tr></table></pre>
@@ -190,7 +190,7 @@ export const <span class="cstat-no" title="statement not covered" >adminDeleteDe
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-19T07:58:56.661Z
+                at 2025-04-21T07:23:13.573Z
             </div>
         <script src="../prettify.js"></script>
         <script>

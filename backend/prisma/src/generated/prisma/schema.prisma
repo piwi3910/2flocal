@@ -29,6 +29,25 @@ model User {
 
   devices        Device[]
   accountSecrets AccountSecret[]
+  refreshTokens  RefreshToken[]
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique // Store only the hash of the token for security
+  expiresAt  DateTime
+  isRevoked  Boolean   @default(false)
+  revokedAt  DateTime?
+  deviceInfo String? // Store device information for better tracking
+  ipAddress  String? // Store IP address for audit purposes
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 // Define an enum for device types

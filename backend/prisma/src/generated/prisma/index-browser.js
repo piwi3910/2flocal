@@ -131,6 +131,19 @@ exports.Prisma.UserScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.RefreshTokenScalarFieldEnum = {
+  id: 'id',
+  tokenHash: 'tokenHash',
+  expiresAt: 'expiresAt',
+  isRevoked: 'isRevoked',
+  revokedAt: 'revokedAt',
+  deviceInfo: 'deviceInfo',
+  ipAddress: 'ipAddress',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  userId: 'userId'
+};
+
 exports.Prisma.DeviceScalarFieldEnum = {
   id: 'id',
   identifier: 'identifier',
@@ -175,6 +188,7 @@ exports.DeviceType = exports.$Enums.DeviceType = {
 
 exports.Prisma.ModelName = {
   User: 'User',
+  RefreshToken: 'RefreshToken',
   Device: 'Device',
   AccountSecret: 'AccountSecret'
 };
