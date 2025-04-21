@@ -94,14 +94,17 @@ export const generateRefreshToken = async (
   // Hash the token for storage
   const tokenHash = hashToken(token);
   
-  // Store the token in the database using raw SQL
-  await prisma.$executeRaw`
-    INSERT INTO "RefreshToken" (
-      "id", "tokenHash", "expiresAt", "isRevoked", "deviceInfo", "ipAddress", "userId", "createdAt", "updatedAt"
-    ) VALUES (
-      ${crypto.randomUUID()}, ${tokenHash}, ${expiresAt}, false, ${deviceInfo}, ${ipAddress}, ${userId}, ${new Date()}, ${new Date()}
-    )
-  `;
+  // Store the token in the database using Prisma ORM
+  await prisma.refreshToken.create({
+    data: {
+      tokenHash,
+      expiresAt,
+      isRevoked: false,
+      deviceInfo,
+      ipAddress,
+      userId
+    }
+  });
   
   return { token, expiresAt };
 };
@@ -115,16 +118,16 @@ export const verifyRefreshToken = async (token: string): Promise<{ userId: strin
   // Hash the token for comparison
   const tokenHash = hashToken(token);
   
-  // Find the token in the database using raw SQL
-  const refreshTokens = await prisma.$queryRaw<RefreshToken[]>`
-    SELECT * FROM "RefreshToken" WHERE "tokenHash" = ${tokenHash}
-  `;
+  // Find the token in the database using Prisma ORM
+  const refreshToken = await prisma.refreshToken.findUnique({
+    where: {
+      tokenHash
+    }
+  });
   
-  if (refreshTokens.length === 0) {
+  if (!refreshToken) {
     return null;
   }
-  
-  const refreshToken = refreshTokens[0];
   
   // Check if token is not expired and not revoked
   if (refreshToken.expiresAt < new Date() || refreshToken.isRevoked) {
@@ -185,12 +188,16 @@ export const revokeRefreshToken = async (token: string): Promise<boolean> => {
   const tokenHash = hashToken(token);
   
   try {
-    // Update the token to mark it as revoked using raw SQL
-    await prisma.$executeRaw`
-      UPDATE "RefreshToken"
-      SET "isRevoked" = true, "revokedAt" = ${new Date()}, "updatedAt" = ${new Date()}
-      WHERE "tokenHash" = ${tokenHash}
-    `;
+    // Update the token to mark it as revoked using Prisma ORM
+    await prisma.refreshToken.updateMany({
+      where: {
+        tokenHash
+      },
+      data: {
+        isRevoked: true,
+        revokedAt: new Date()
+      }
+    });
     
     return true;
   } catch (error) {
@@ -206,14 +213,19 @@ export const revokeRefreshToken = async (token: string): Promise<boolean> => {
  */
 export const revokeAllUserRefreshTokens = async (userId: string): Promise<number> => {
   try {
-    // Update all tokens for the user to mark them as revoked using raw SQL
-    const result = await prisma.$executeRaw`
-      UPDATE "RefreshToken"
-      SET "isRevoked" = true, "revokedAt" = ${new Date()}, "updatedAt" = ${new Date()}
-      WHERE "userId" = ${userId} AND "isRevoked" = false
-    `;
+    // Update all tokens for the user to mark them as revoked using Prisma ORM
+    const result = await prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        isRevoked: false
+      },
+      data: {
+        isRevoked: true,
+        revokedAt: new Date()
+      }
+    });
     
-    return Number(result);
+    return result.count;
   } catch (error) {
     console.error('Error revoking all user refresh tokens:', error);
     return 0;
@@ -228,11 +240,16 @@ export const revokeAllUserRefreshTokens = async (userId: string): Promise<number
 export const getRefreshTokenDeviceInfo = async (token: string): Promise<string | undefined> => {
   const tokenHash = hashToken(token);
   
-  const refreshTokens = await prisma.$queryRaw<{ deviceInfo: string | null }[]>`
-    SELECT "deviceInfo" FROM "RefreshToken" WHERE "tokenHash" = ${tokenHash}
-  `;
+  const refreshToken = await prisma.refreshToken.findUnique({
+    where: {
+      tokenHash
+    },
+    select: {
+      deviceInfo: true
+    }
+  });
   
-  return refreshTokens.length > 0 ? refreshTokens[0].deviceInfo || undefined : undefined;
+  return refreshToken?.deviceInfo || undefined;
 };
 
 /**
@@ -243,9 +260,14 @@ export const getRefreshTokenDeviceInfo = async (token: string): Promise<string |
 export const getRefreshTokenIpAddress = async (token: string): Promise<string | undefined> => {
   const tokenHash = hashToken(token);
   
-  const refreshTokens = await prisma.$queryRaw<{ ipAddress: string | null }[]>`
-    SELECT "ipAddress" FROM "RefreshToken" WHERE "tokenHash" = ${tokenHash}
-  `;
+  const refreshToken = await prisma.refreshToken.findUnique({
+    where: {
+      tokenHash
+    },
+    select: {
+      ipAddress: true
+    }
+  });
   
-  return refreshTokens.length > 0 ? refreshTokens[0].ipAddress || undefined : undefined;
+  return refreshToken?.ipAddress || undefined;
 };
