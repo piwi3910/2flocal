@@ -70,26 +70,26 @@ const authService = {
   login: async (data: LoginData): Promise<AuthResponse> => {
     try {
       const response = await api.post('/auth/login', data);
-      
+
       // Handle both old and new token formats
       if (response.data.accessToken) {
         setAuthToken(response.data.accessToken);
-        
+
         // Store refresh token in secure storage
         if (response.data.refreshToken) {
           await secureStorage.setItem(SecureStorageKeys.REFRESH_TOKEN, response.data.refreshToken);
-          
+
           if (response.data.refreshTokenExpiry) {
             await secureStorage.setItem(SecureStorageKeys.REFRESH_TOKEN_EXPIRY, response.data.refreshTokenExpiry);
           }
         }
-        
+
         // For backward compatibility
         response.data.token = response.data.accessToken;
       } else if (response.data.token) {
         setAuthToken(response.data.token);
       }
-      
+
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
@@ -182,29 +182,29 @@ const authService = {
     try {
       // Get stored refresh token
       const refreshToken = await secureStorage.getItem(SecureStorageKeys.REFRESH_TOKEN);
-      
+
       if (!refreshToken) {
         throw new Error('No refresh token available');
       }
-      
+
       const response = await api.post('/auth/refresh-token', { refreshToken });
-      
+
       if (response.data.accessToken) {
         setAuthToken(response.data.accessToken);
-        
+
         // Update stored refresh token if a new one is provided (token rotation)
         if (response.data.refreshToken) {
           await secureStorage.setItem(SecureStorageKeys.REFRESH_TOKEN, response.data.refreshToken);
-          
+
           if (response.data.refreshTokenExpiry) {
             await secureStorage.setItem(SecureStorageKeys.REFRESH_TOKEN_EXPIRY, response.data.refreshTokenExpiry);
           }
         }
-        
+
         // For backward compatibility
         response.data.token = response.data.accessToken;
       }
-      
+
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
@@ -213,23 +213,23 @@ const authService = {
       throw new Error('Network error during token refresh');
     }
   },
-  
+
   // Revoke refresh token
   revokeToken: async (): Promise<AuthResponse> => {
     try {
       // Get stored refresh token
       const refreshToken = await secureStorage.getItem(SecureStorageKeys.REFRESH_TOKEN);
-      
+
       if (!refreshToken) {
         throw new Error('No refresh token available');
       }
-      
+
       const response = await api.post('/auth/revoke-token', { refreshToken });
-      
+
       // Clear stored refresh token
       await secureStorage.removeItem(SecureStorageKeys.REFRESH_TOKEN);
       await secureStorage.removeItem(SecureStorageKeys.REFRESH_TOKEN_EXPIRY);
-      
+
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
@@ -238,13 +238,13 @@ const authService = {
       throw new Error('Network error during token revocation');
     }
   },
-  
+
   // Logout (client-side only)
   logout: async (): Promise<void> => {
     try {
       // Try to revoke the refresh token on logout
       const refreshToken = await secureStorage.getItem(SecureStorageKeys.REFRESH_TOKEN);
-      
+
       if (refreshToken) {
         try {
           await api.post('/auth/revoke-token', { refreshToken });
@@ -252,11 +252,11 @@ const authService = {
           console.error('Error revoking token during logout:', error);
         }
       }
-      
+
       // Clear all auth-related storage
       await secureStorage.removeItem(SecureStorageKeys.REFRESH_TOKEN);
       await secureStorage.removeItem(SecureStorageKeys.REFRESH_TOKEN_EXPIRY);
-      
+
       setAuthToken(null);
     } catch (error) {
       console.error('Error during logout:', error);
