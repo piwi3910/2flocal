@@ -4,21 +4,27 @@ import { User } from '../../prisma/src/generated/prisma';
 // Email configuration
 const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.example.com';
 const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587', 10);
-const EMAIL_USER = process.env.EMAIL_USER || 'user@example.com';
-const EMAIL_PASS = process.env.EMAIL_PASS || 'password';
+const EMAIL_USER = process.env.EMAIL_USER || '';
+const EMAIL_PASS = process.env.EMAIL_PASS || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || '2FLocal <noreply@2flocal.com>';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
-// Create a transporter
-const transporter = nodemailer.createTransport({
+// Create a transporter with conditional authentication
+const transporterConfig: any = {
   host: EMAIL_HOST,
   port: EMAIL_PORT,
   secure: EMAIL_PORT === 465, // true for 465, false for other ports
-  auth: {
+};
+
+// Only add auth if credentials are provided
+if (EMAIL_USER && EMAIL_PASS) {
+  transporterConfig.auth = {
     user: EMAIL_USER,
     pass: EMAIL_PASS,
-  },
-});
+  };
+}
+
+const transporter = nodemailer.createTransport(transporterConfig);
 
 /**
  * Send an email
