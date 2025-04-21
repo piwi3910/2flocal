@@ -1,6 +1,6 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, setAuthToken as setApiAuthToken } from './apiClient';
+import { secureStorage, SecureStorageKeys } from '../services/secureStorageService';
 
 // Types for authentication
 export interface RegisterData {
@@ -77,10 +77,10 @@ const authService = {
         
         // Store refresh token in secure storage
         if (response.data.refreshToken) {
-          await AsyncStorage.setItem('@2FLocal:refreshToken', response.data.refreshToken);
+          await secureStorage.setItem(SecureStorageKeys.REFRESH_TOKEN, response.data.refreshToken);
           
           if (response.data.refreshTokenExpiry) {
-            await AsyncStorage.setItem('@2FLocal:refreshTokenExpiry', response.data.refreshTokenExpiry);
+            await secureStorage.setItem(SecureStorageKeys.REFRESH_TOKEN_EXPIRY, response.data.refreshTokenExpiry);
           }
         }
         
@@ -181,7 +181,7 @@ const authService = {
   refreshToken: async (): Promise<AuthResponse> => {
     try {
       // Get stored refresh token
-      const refreshToken = await AsyncStorage.getItem('@2FLocal:refreshToken');
+      const refreshToken = await secureStorage.getItem(SecureStorageKeys.REFRESH_TOKEN);
       
       if (!refreshToken) {
         throw new Error('No refresh token available');
@@ -194,10 +194,10 @@ const authService = {
         
         // Update stored refresh token if a new one is provided (token rotation)
         if (response.data.refreshToken) {
-          await AsyncStorage.setItem('@2FLocal:refreshToken', response.data.refreshToken);
+          await secureStorage.setItem(SecureStorageKeys.REFRESH_TOKEN, response.data.refreshToken);
           
           if (response.data.refreshTokenExpiry) {
-            await AsyncStorage.setItem('@2FLocal:refreshTokenExpiry', response.data.refreshTokenExpiry);
+            await secureStorage.setItem(SecureStorageKeys.REFRESH_TOKEN_EXPIRY, response.data.refreshTokenExpiry);
           }
         }
         
@@ -218,7 +218,7 @@ const authService = {
   revokeToken: async (): Promise<AuthResponse> => {
     try {
       // Get stored refresh token
-      const refreshToken = await AsyncStorage.getItem('@2FLocal:refreshToken');
+      const refreshToken = await secureStorage.getItem(SecureStorageKeys.REFRESH_TOKEN);
       
       if (!refreshToken) {
         throw new Error('No refresh token available');
@@ -227,8 +227,8 @@ const authService = {
       const response = await api.post('/auth/revoke-token', { refreshToken });
       
       // Clear stored refresh token
-      await AsyncStorage.removeItem('@2FLocal:refreshToken');
-      await AsyncStorage.removeItem('@2FLocal:refreshTokenExpiry');
+      await secureStorage.removeItem(SecureStorageKeys.REFRESH_TOKEN);
+      await secureStorage.removeItem(SecureStorageKeys.REFRESH_TOKEN_EXPIRY);
       
       return response.data;
     } catch (error) {
@@ -243,7 +243,7 @@ const authService = {
   logout: async (): Promise<void> => {
     try {
       // Try to revoke the refresh token on logout
-      const refreshToken = await AsyncStorage.getItem('@2FLocal:refreshToken');
+      const refreshToken = await secureStorage.getItem(SecureStorageKeys.REFRESH_TOKEN);
       
       if (refreshToken) {
         try {
@@ -254,8 +254,8 @@ const authService = {
       }
       
       // Clear all auth-related storage
-      await AsyncStorage.removeItem('@2FLocal:refreshToken');
-      await AsyncStorage.removeItem('@2FLocal:refreshTokenExpiry');
+      await secureStorage.removeItem(SecureStorageKeys.REFRESH_TOKEN);
+      await secureStorage.removeItem(SecureStorageKeys.REFRESH_TOKEN_EXPIRY);
       
       setAuthToken(null);
     } catch (error) {
@@ -263,7 +263,8 @@ const authService = {
       // Still clear tokens even if there was an error
       setAuthToken(null);
     }
-  }
+  },
 };
 
 export default authService;
+
